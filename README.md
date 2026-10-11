@@ -119,3 +119,18 @@ api/notes.js에서 시작 틀의 src/verify-login.mjs의 createLoginVerifier를 
 사용자는 A의 로그인·로그아웃·추가·수정·삭제와 무로그인 POST의 401을 확인했습니다. 이는 사용자 검증 기록이며 이 환경에서 A 계정으로 재실행하지 않았습니다. 직접 점검은 `npm run bundle`에서 현재 배포에 무로그인 GET·POST·PUT·DELETE, 잘못된 토큰 GET, 공개 data.json 요청을 보내고 HTTP 상태와 자료 감지 여부만 기록합니다. 실제 메모 본문·토큰·비밀 키는 제출 묶음에 포함하지 않습니다. 실행 실패는 미확인으로 기록하며 심판 판정으로 표현하지 않습니다.
 
 빌드: `npm run build -- --local`. 제출: 저장점 커밋 후 로컬 전용 bundle-notes.json의 explanation에 작업 설명을 적고 `npm run bundle`을 실행합니다. bundle-notes.json과 artifacts/submission.json은 Git에 커밋하지 않습니다. 정상 로그인 CRUD는 사용자 검증과 별도이며 B의 타인 메모 접근은 4단계 미검증으로 유지합니다. 상세 소유자 검사 부재 및 과거 공개 커밋·배포 노출 한계도 유지합니다.
+
+
+## 4단계 저장점
+
+기준 GitHub main: f75c4df9226b884d929831672f8a07cbeccb85e0. 3단계 최종 저장점은 e227a482f0b0ff84578967638bef88d1f36c9381이며 위 3단계 내용은 당시 기록입니다. API 소유권 구현과 테스트는 이미 커밋되어 있으므로 중복 구현하지 않습니다. 설정 step을 4로 기록하며 발급자·5개 allowedRoutes·judgeIssuer·배포 설정은 보존합니다.
+
+목록과 상세 GET·PUT·DELETE는 검증된 identity.userId로 owner_id를 제한합니다. POST는 확인된 ID로 소유자를 저장합니다. POST·PUT 본문 owner_id는 400으로 거부하고 PUT은 기존 소유자를 보존하며 반환된 소유자도 확인합니다. 타인 상세 접근은 404 NOTE_NOT_FOUND입니다.
+
+사용자 실제 검증: 원본 A 메모 4건 보존, A/B 자기 메모 CRUD 확인 범위 기록, B의 A 메모 GET·PUT·DELETE 모두 404, RLS 활성화와 소유자 정책 4개, anon 권한 7종 false, authenticated CRUD만 true, service_role 기존 권한 유지. 이 환경에서 DB·로그인 계정으로 재실행한 결과가 아니며 각 CRUD 세부 증빙과 A의 B 접근은 독립 재검증하지 않았습니다.
+
+학습 SQL은 공개 저장소 밖에서 사용자가 실행했습니다. service_role 서버 요청은 RLS를 우회하므로 API 소유권 검사도 필요합니다. 과거 공개 커밋·배포 노출이 완전히 해소되었다고 주장하지 않습니다.
+
+재실행: `node --test test/notes-ownership.test.mjs`, `npm run build -- --local`, 저장점 커밋 후 로컬 전용 bundle-notes.json을 작성하고 `npm run bundle`. 화면에서 A/B 각각 로그인하여 자기 메모 추가·수정·삭제를 확인하고 상대 UUID 접근은 404, owner_id 변경 요청은 400인지 확인합니다. 모의 테스트와 실제 심판 판정은 별개입니다.
+
+번들 자기 점검은 현재 배포에 무로그인 CRUD·잘못된 토큰·data.json의 7개 요청을 실제로 보냅니다. 실제 A/B 토큰이나 DB 관리자 연결이 없는 소유권·RLS 점검은 미실행으로 기록하며 사용자 검증을 독립 실행으로 바꾸지 않습니다. 로컬 저장점 커밋과 GitHub 반영·배포는 각각 별도로 확인해야 합니다.
