@@ -16,15 +16,15 @@
     },
     {
       "alertId": "bf-03",
-      "action": "alert",
-      "confidence": 0.55,
-      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 실패 신호는 있으나 단시간 반복 조건 부족"
+      "action": "block",
+      "confidence": 0.9,
+      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 단시간 다수 실패와 계정 이름 변경의 결합; 반복 출발 주소는 미확인"
     },
     {
       "alertId": "bf-04",
-      "action": "alert",
-      "confidence": 0.75,
-      "reason": "같은 계정에 대한 반복 비밀번호 추측 의심: 계정 반복 실패 의심; 같은 주소 반복 명시 부족"
+      "action": "block",
+      "confidence": 0.9,
+      "reason": "같은 계정에 대한 반복 비밀번호 추측 의심: 한 계정의 단시간 다수 실패와 성공 없음의 결합"
     },
     {
       "alertId": "bf-05",
@@ -40,9 +40,9 @@
     },
     {
       "alertId": "bf-07",
-      "action": "alert",
-      "confidence": 0.75,
-      "reason": "같은 계정에 대한 반복 비밀번호 추측 의심: 설명상 반복 추측 의심; 비밀번호·집계 조건 독립 확인 불가"
+      "action": "block",
+      "confidence": 0.9,
+      "reason": "같은 계정에 대한 반복 비밀번호 추측 의심: 경보에 명시된 체계적 비밀번호 변경과 다수 실패; 시간 범위는 미확인"
     },
     {
       "alertId": "bf-08",
@@ -172,8 +172,8 @@
     }
   ],
   "counts": {
-    "block": 2,
-    "alert": 17,
+    "block": 5,
+    "alert": 14,
     "record": 9
   }
 }

@@ -48,6 +48,8 @@ export function decide(alert) {
     || /같은 비밀번호[^。\n]*(?:여러|서로 다른)\s*계정/u.test(description);
   const sameSource = /(?:같은|한)\s*주소/u.test(description);
   const sameAccount = /(?:같은|한)\s*계정/u.test(description);
+  const changingAccounts = /계정\s*이름을\s*바꿔\s*가며/u.test(description);
+  const systematicGuessing = /비밀번호를\s*한 글자씩\s*바꿔/u.test(description);
   const guessing = /비밀번호를\s*한 글자씩\s*바꿔/u.test(description)
     || /비밀번호[^。\n]*(?:반복 추측|반복 대입)/u.test(description);
 
@@ -73,6 +75,19 @@ export function decide(alert) {
     pattern = PATTERNS[2];
     confidence = 0.7;
     rationale = '여러 계정 실패; 동일 비밀번호 사용 여부 미확인';
+  } else if (source && failure && changingAccounts && count !== null && count >= 30
+      && minutes !== null && minutes <= 3) {
+    confidence = 0.9;
+    rationale = '단시간 다수 실패와 계정 이름 변경의 결합; 반복 출발 주소는 미확인';
+  } else if (source && account && failure && sameAccount && count !== null && count >= 30
+      && minutes !== null && minutes <= 3 && /성공은\s*없/u.test(description)) {
+    pattern = PATTERNS[1];
+    confidence = 0.9;
+    rationale = '한 계정의 단시간 다수 실패와 성공 없음의 결합';
+  } else if (source && account && failure && systematicGuessing && count !== null && count >= 30) {
+    pattern = PATTERNS[1];
+    confidence = 0.9;
+    rationale = '경보에 명시된 체계적 비밀번호 변경과 다수 실패; 시간 범위는 미확인';
   } else if (source && failure && sameSource && count !== null && count >= 30
       && minutes !== null && minutes <= 3) {
     confidence = 0.9;
