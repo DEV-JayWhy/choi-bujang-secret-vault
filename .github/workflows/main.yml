@@ -8,6 +8,11 @@ on:
         required: false
         default: ''
         type: string
+      check_app_url:
+        description: 'HTTP check URL: Preview root HTTPS URL required on stage5-server-auth; blank on main uses production config'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
@@ -24,10 +29,13 @@ jobs:
       - name: Select and verify submission baseline
         env:
           TARGET_COMMIT: ${{ inputs.target_commit || github.sha }}
+          BASELINE_BRANCH: ${{ github.ref_name }}
+          CHECK_APP_URL: ${{ inputs.check_app_url }}
         run: |
           [[ "$TARGET_COMMIT" =~ ^[0-9a-f]{40}$ ]]
           test "$(git rev-parse --is-shallow-repository)" = false
-          git merge-base --is-ancestor "$TARGET_COMMIT" origin/main
+          git merge-base --is-ancestor "$TARGET_COMMIT" "origin/$BASELINE_BRANCH"
+          if [ "$BASELINE_BRANCH" = stage5-server-auth ]; then test -n "$CHECK_APP_URL"; fi
           git checkout --detach "$TARGET_COMMIT"
           test "$(git rev-parse HEAD)" = "$TARGET_COMMIT"
           git log -1 --format='%H %s'
@@ -46,12 +54,14 @@ jobs:
         run: |
           cat > bundle-notes.json <<'EOF'
           {
-            "explanation": "5단계 브라우저 코드 점검에서 메모 CRUD의 Supabase 직접 호출이 없고 기존 서버 함수만 호출함을 확인했습니다. 공개 publishable 키로 원본 REST GET을 실제 실행해 HTTP 401·42501 권한 거부와 메모 미반환을 확인했습니다. 기존 소유권 모의 CRUD 테스트는 통과했으며 실제 A 로그인 CRUD 및 B 접근의 이번 독립 재검증은 수행하지 않았습니다. 인증된 사용자 JWT 원본 GET·수정 요청은 세션 부재로 미실행입니다. DB 권한·RLS 적용 상태는 사용자 보고와 독립 검증을 구분하며 이번 준비에서 DB 재검증과 번들 실행은 하지 않았습니다.",
-            "blockedAt": "실제 A/B 로그인 동작, 인증된 사용자 원본 API 접근·수정 및 DB 권한의 독립 재검증"
+            "explanation": "사용자 실제 Preview 검증(3576932 기준): A 로그인, 기존 메모 4건 조회, 시험 메모 추가·수정·삭제, B 자기 메모만 표시, 로그아웃 후 새로고침 시 메모 미표시, auth-config.js 404, data.json 404. 독립 읽기 전용 DB 조회에서 RLS 활성화·소유자 정책 4개·PUBLIC 테이블 권한 없음·anon/authenticated 테이블 7종 및 직접 열 권한 없음·service_role 7종 true를 확인했습니다. 이번 보완 이후 실제 계정 재시험·타인 ID 직접 요청·배포 헤더·만료 후 갱신·로그 비밀값 검사는 미검증입니다. HTTP 자기 점검 대상은 별도 표시하며 Preview 결과를 Production 검증으로 표현하지 않습니다.",
+            "blockedAt": "보완 이후 실제 계정/타인 ID/만료 세션/배포 헤더/로그 재검증; 인증된 사용자 원본 REST 직접 차단 시험 미실행"
           }
           EOF
 
       - name: Generate submission bundle
+        env:
+          ALEPH_CHECK_APP_URL: ${{ inputs.check_app_url }}
         run: npm run bundle
 
       - name: Verify submission commit and changedFiles

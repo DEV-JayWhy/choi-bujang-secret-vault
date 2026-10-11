@@ -12,6 +12,7 @@ const note = row => ({ id: row.id, title: row.title, body: row.content });
 export function notesHandler(detail) {
   return async (request, response) => {
     response.setHeader('Cache-Control', 'no-store');
+    response.setHeader('X-Content-Type-Options', 'nosniff');
     const methods = detail ? ['GET', 'PUT', 'DELETE'] : ['GET', 'POST'];
     if (!methods.includes(request.method)) {
       response.setHeader('Allow', methods.join(', '));

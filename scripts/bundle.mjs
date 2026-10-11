@@ -71,7 +71,21 @@ try {
   const checkerUrl = pathToFileURL(join(root, 'src', 'attack-check.mjs'));
   const { runAttackChecks } = await import(checkerUrl.href);
   if (typeof runAttackChecks !== 'function') fail('src/attack-check.mjs가 runAttackChecks를 내보내야 합니다.');
-  const attackAttempts = await runAttackChecks(config);
+  // Keep the committed production identity; explicitly label the HTTP check target.
+  const checkAppUrl = process.env.ALEPH_CHECK_APP_URL || config.publicAppUrl;
+  const checkTarget = new URL(checkAppUrl);
+  if (checkTarget.protocol !== 'https:' || !checkTarget.hostname.endsWith('.vercel.app')
+      || checkTarget.username || checkTarget.password || checkTarget.port
+      || checkTarget.pathname !== '/' || checkTarget.search || checkTarget.hash) {
+    fail('자기 점검 대상은 쿼리 없는 Vercel HTTPS 루트 주소여야 합니다.');
+  }
+  const targetLabel = checkTarget.origin === new URL(config.publicAppUrl).origin ? 'Production 설정 주소' : '별도 지정 검증 주소';
+  const attackAttempts = await runAttackChecks({ ...config, publicAppUrl: checkTarget.origin });
+  for (const attempt of attackAttempts) {
+    if (!['cross_owner_note_access', 'owner_change_rejected', 'database_rls_privileges'].includes(attempt.attackId)) {
+      attempt.observed = `[HTTP 점검 대상 ${checkTarget.hostname}] ${attempt.observed}`;
+    }
+  }
   if (!Array.isArray(attackAttempts) || !attackAttempts.length || attackAttempts.length > 20) {
     fail('직접 실행한 공격 점검 결과 1~20개가 필요합니다.');
   }
@@ -90,7 +104,7 @@ try {
   const bundle = {
     schema: 'aleph.defense.submission.v2', step: config.step, commit, repoUrl,
     changedFiles, policyRules,
-    attackAttempts, explanation: notes.explanation.trim(), blockedAt: notes.blockedAt ?? null,
+    attackAttempts, explanation: `${notes.explanation.trim()}\n이번 HTTP 자기 점검 대상: ${targetLabel} ${checkTarget.origin}. 다른 배포의 검증 결과로 해석하지 않습니다.`, blockedAt: notes.blockedAt ?? null,
     identityProvider: config.identityProvider ?? null, allowedRoutes: config.allowedRoutes ?? [],
     originalApiUrl: config.originalApiUrl ?? null, restoreRoute: config.restoreRoute ?? null,
   };

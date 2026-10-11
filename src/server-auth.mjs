@@ -37,6 +37,10 @@ export function authHandler(action) {
     const method = action === 'session' ? 'GET' : 'POST';
     if (request.method !== method) { response.setHeader('Allow', method); return response.status(405).json({ error: 'METHOD_NOT_ALLOWED' }); }
     if (method === 'POST' && !sameOrigin(request)) return response.status(403).json({ error: 'ORIGIN_DENIED' });
+    if (action === 'session' && (['cross-site', 'same-site'].includes(request.headers?.['sec-fetch-site'])
+        || (request.headers?.origin && !sameOrigin(request)))) {
+      return response.status(403).json({ error: 'ORIGIN_DENIED' });
+    }
     try {
       const auth = client().auth;
       if (action === 'login') {
@@ -55,7 +59,19 @@ export function authHandler(action) {
       const token = cookieToken(request);
       if (action === 'logout') {
         cookies(response, null);
-        if (token) { const { error } = await auth.admin.signOut(token, 'local'); if (error && ![401,403,404].includes(error.status)) return response.status(502).json({ error: 'LOGOUT_FAILED' }); }
+        let revokeError;
+        if (token) ({ error: revokeError } = await auth.admin.signOut(token, 'local'));
+        if (!token || [401,403,404].includes(revokeError?.status)) {
+          const refresh = cookieToken(request, REFRESH);
+          if (refresh) {
+            const { data, error } = await auth.refreshSession({ refresh_token: refresh });
+            if (error && (!error.status || error.status >= 500 || error.status === 429)) {
+              return response.status(502).json({ error: 'LOGOUT_FAILED' });
+            }
+            if (!error && data.session) ({ error: revokeError } = await auth.admin.signOut(data.session.access_token, 'local'));
+          }
+        }
+        if (revokeError && ![401,403,404].includes(revokeError.status)) return response.status(502).json({ error: 'LOGOUT_FAILED' });
         return response.status(200).json({ user: null });
       }
       if (token) { const { data, error } = await auth.getUser(token); if (!error && data.user) return response.status(200).json(publicSession(data.user)); }

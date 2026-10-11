@@ -5,7 +5,7 @@ import collection from '../api/notes.js';
 import detail from '../api/notes/[id].js';
 import { readFileSync } from 'node:fs';
 const config = JSON.parse(readFileSync(new URL('../aleph.config.json', import.meta.url)));
-const response = () => ({ setHeader() {}, status(code) { this.code = code; return this; },
+const response = () => ({ headers: {}, setHeader(k,v) { this.headers[k]=v; }, status(code) { this.code = code; return this; },
   json(body) { this.body = body; return this; } });
 test('A/B own CRUD, cross-owner denial, owner spoof denial and unauthenticated denial (HttpOnly cookie transport, mock DB)', async () => {
   const previousFetch = globalThis.fetch;
@@ -24,7 +24,7 @@ test('A/B own CRUD, cross-owner denial, owner spoof denial and unauthenticated d
     .setIssuedAt().setExpirationTime('5m').sign(privateKey);
   const bHeaders = { cookie: `__Host-vault-access=${bToken}`, origin: config.publicAppUrl };
   async function call(handler, method, body, id, auth = headers) {
-    const res = response(); await handler({ method, body, headers: auth, query: { id, userId: 'spoof', role: 'admin' } }, res); return res;
+    const res = response(); await handler({ method, body, headers: auth, query: { id, userId: 'spoof', role: 'admin' } }, res); assert.equal(res.headers['X-Content-Type-Options'],'nosniff'); return res;
   }
   try {
     process.env.SUPABASE_URL = new URL(config.identityProvider.issuer).origin;

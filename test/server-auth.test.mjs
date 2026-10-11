@@ -9,7 +9,7 @@ const origin=config.publicAppUrl;
 const user={id:'11111111-1111-4111-8111-111111111111',email:'local@example.invalid'};
 test('server SDK login/session/refresh/logout; no credentials in JSON; CSRF and invalid login rejection', async () => {
   const oldFetch=globalThis.fetch, oldUrl=process.env.SUPABASE_URL, oldKey=process.env.SUPABASE_SECRET_KEY;
-  const access='local.test.access', refresh='local-refresh'; let calls=0;
+  const access='local.test.access', refresh='local-refresh'; let calls=0; let refreshCalls=0; let revokeCalls=0;
   try {
     process.env.SUPABASE_URL=new URL(config.identityProvider.issuer).origin;
     process.env.SUPABASE_SECRET_KEY='local-test-server-key';
@@ -18,11 +18,17 @@ test('server SDK login/session/refresh/logout; no credentials in JSON; CSRF and 
       const u=new URL(String(input)); const json=(d,status=200)=>new Response(JSON.stringify(d),{status,headers:{'Content-Type':'application/json'}});
       if(u.pathname.endsWith('/token')) {
         const body=JSON.parse(init.body);
+        if(u.searchParams.get('grant_type')==='refresh_token') {
+          refreshCalls++;
+          if(body.refresh_token==='invalid-refresh') return json({error_code:'refresh_token_not_found',msg:'invalid'},400);
+        }
         if(u.searchParams.get('grant_type')==='password' && body.password==='wrong') return json({error_code:'invalid_credentials',msg:'invalid'},400);
         return json({access_token:access,refresh_token:refresh,expires_in:3600,token_type:'bearer',user});
       }
       if(u.pathname.endsWith('/user')) return json(user);
-      if(u.pathname.endsWith('/logout')) return new Response(null,{status:204});
+      if(u.pathname.endsWith('/logout')) { revokeCalls++;
+        if(new Headers(init.headers).get('Authorization')==='Bearer expired.test.access') return json({error_code:'bad_jwt',msg:'expired'},401);
+        return new Response(null,{status:204}); }
       throw new Error('unexpected endpoint');
     };
     const call=async(action,headers={},body)=>{const r=response();await authHandler(action)({method:action==='session'?'GET':'POST',headers,body},r);return r;};
@@ -43,6 +49,23 @@ test('server SDK login/session/refresh/logout; no credentials in JSON; CSRF and 
     assert.equal((await call('logout',{cookie,origin:'https://other.invalid'})).code,403);
     r=await call('logout',{cookie,origin});assert.equal(r.code,200);assert.deepEqual(r.body,{user:null});
     assert.ok(r.headers['Set-Cookie'].every(c=>c.includes('Max-Age=0')));
+    const beforeRefresh=refreshCalls, beforeRevoke=revokeCalls;
+    r=await call('logout',{origin,cookie:'__Host-vault-refresh='+refresh});
+    assert.equal(r.code,200); assert.equal(refreshCalls,beforeRefresh+1); assert.equal(revokeCalls,beforeRevoke+1);
+    assert.ok(r.headers['Set-Cookie'].every(c=>c.includes('Max-Age=0')));
+    const expiredRefresh=refreshCalls, expiredRevoke=revokeCalls;
+    r=await call('logout',{origin,cookie:'__Host-vault-access=expired.test.access; __Host-vault-refresh='+refresh});
+    assert.equal(r.code,200); assert.equal(refreshCalls,expiredRefresh+1); assert.equal(revokeCalls,expiredRevoke+2);
+    const invalidRevoke=revokeCalls;
+    r=await call('logout',{origin,cookie:'__Host-vault-refresh=invalid-refresh'});
+    assert.equal(r.code,200); assert.equal(revokeCalls,invalidRevoke);
+    assert.ok(r.headers['Set-Cookie'].every(c=>c.includes('Max-Age=0')));
+    const beforeCalls=calls;
+    for(const headers of [ {'sec-fetch-site':'cross-site'}, {'sec-fetch-site':'same-site'}, {origin:'https://other.invalid'} ]) {
+      r=await call('session',{...headers,cookie}); assert.equal(r.code,403); assert.equal(r.headers['Set-Cookie'],undefined);
+      assert.equal(r.headers['X-Content-Type-Options'],'nosniff');
+    }
+    assert.equal(calls,beforeCalls);
     assert.equal(cookieToken({headers:{cookie:'__Host-vault-access=x; __Host-vault-access=y'}}),null);
     assert.equal(cookieToken({headers:{cookie:'__Host-vault-access=bad%0a'}}),null);
     assert.equal(sameOrigin({headers:{origin:'https://other.invalid'}}),false);

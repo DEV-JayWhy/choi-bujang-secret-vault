@@ -137,7 +137,7 @@ api/notes.js에서 시작 틀의 src/verify-login.mjs의 createLoginVerifier를 
 
 ## 5단계 가점용 별도 브랜치: 서버 로그인
 
-기준 커밋은 `808002445276e35676abeef644e844a004743c37`이며 `stage5-server-auth`에서만 작업합니다. main 병합과 운영 배포 전환은 하지 않습니다. 이전 단계 기록은 당시 결과이며, 이 변경의 실제 A/B 계정 로그인은 아직 미검증입니다.
+기준 커밋은 `808002445276e35676abeef644e844a004743c37`이며 `stage5-server-auth`에서만 작업합니다. main 병합과 운영 배포 전환은 하지 않습니다. 이전 단계 기록은 당시 결과이며, 3576932 Preview의 사용자 실제 검증은 아래에 기록하며 보완 후 새 배포의 실제 계정 검증과 구분합니다.
 
 브라우저의 Supabase 공개 키 설정 파일과 CDN SDK를 제거했습니다. 로그인은 `POST /api/auth/login`, 세션 확인·만료 시 SDK 갱신은 `GET /api/auth/session`, 로그아웃은 `POST /api/auth/logout`을 사용합니다. 서버는 기존 `SUPABASE_URL`, `SUPABASE_SECRET_KEY`만 사용합니다. Preview에도 두 변수가 설정되어 있어야 하며 값 자체를 공유하지 않습니다. SDK `signInWithPassword`, `getUser`, `refreshSession`, `admin.signOut`을 사용하고, 응답 JSON에는 사용자 ID·이메일만 포함합니다. 토큰은 Secure·HttpOnly·SameSite=Strict·Path=/인 호스트 전용 쿠키에 저장합니다.
 
@@ -148,3 +148,22 @@ api/notes.js에서 시작 틀의 src/verify-login.mjs의 createLoginVerifier를 
 Preview에서 직접 확인할 항목: A/B 로그인 후 각자 메모 조회·추가·수정·삭제, 로그아웃 후 자료 거부, 새로고침·토큰 만료 후 세션 갱신, B의 A 메모 GET/PUT/DELETE 404. 브라우저 Network에서 자료 요청이 같은 호스트 `/api/notes`로만 가고 공개 키가 없는지 확인합니다. `/auth-config.js`와 `/data.json`은 404여야 합니다.
 
 남은 위험: 과거 공개 커밋·과거 배포의 공개 키는 삭제되지 않습니다. 공개 키 제거는 DB 권한·소유자 검사에 대한 대체 수단이 아닙니다. 인증 함수는 공개 주소이며 별도의 앱 로그인 요청 제한을 추가하지 않았습니다. HttpOnly는 토큰 읽기를 제한하지만 XSS가 같은 출처 요청을 보내는 위험은 남습니다. SDK 로그아웃이 갱신 세션을 회수해도 이미 발급된 JWT는 만료까지 유효할 수 있습니다. 여러 탭의 동시 갱신·실제 A/B 계정·Preview 환경변수 설정은 실제 환경에서 별도로 확인해야 합니다. 100점 여부는 심판 평가 미확인입니다.
+
+### 최종 검수 후 최소 보완
+
+사용자 실제 Preview 검증(커밋 `35769329d5e492065190aa0918531991ca189e0b`, `https://choi-bujang-secret-vault-7mlo0idyu-jyp13.vercel.app`):
+1. A 계정 로그인 성공
+2. A 기존 메모 4개 조회 성공
+3. 시험 메모 추가·수정·삭제 성공
+4. B 로그인 시 B 메모만 표시
+5. 로그아웃 후 새로고침 시 메모 미표시
+6. `/auth-config.js` 404
+7. `/data.json` 404
+
+2026-10-12 최종 검수의 독립 읽기 전용 DB 조회: RLS enabled=true, forced=false, 소유자 CRUD 정책 4개와 USING/WITH CHECK 조건 정상. PUBLIC 테이블 ACL 없음. anon·authenticated 테이블 권한 7종 모두 false, 직접 열 SELECT/INSERT/UPDATE/REFERENCES 권한도 없음. service_role 권한 7종 모두 true. 기존 결과와 일치하지만 이번 조회에서 적용 전후 비교나 DB 변경을 수행한 것은 아닙니다.
+
+보완: access 쿠키가 없거나 로그아웃에 사용할 수 없으면 refresh 쿠키로 SDK 갱신 후 세션 회수를 시도합니다. 갱신 토큰이 무효이면 쿠키를 지우고, 서버 장애·요청 제한이면 실패를 알립니다. 세션 GET의 cross-site/same-site 또는 잘못된 Origin 요청은 쿠키 변경 전에 403으로 거부합니다. Vercel 전체 경로와 메모·인증 API 응답에 nosniff를 적용합니다.
+
+제출 검증 대상: `aleph.config.json.publicAppUrl`은 기존 Production 주소로 보존합니다. 별도 주소 검수 시 `ALEPH_CHECK_APP_URL` 또는 Actions의 `check_app_url`에 해당 Preview 루트 HTTPS 주소를 지정합니다. stage5-server-auth Actions에서는 주소를 반드시 입력합니다. 각 observed와 설명에 실제 HTTP 요청 대상을 기록합니다. changedFiles는 계속 HEAD 한 커밋의 변경 파일이며 임의 합산하지 않습니다. 워크플로 기준 SHA는 실행한 브랜치의 이력에 포함되어야 합니다. Preview 실행 성공은 Production 검증·최종 제출 성공을 의미하지 않습니다. 이번 작업에서는 bundle과 최종 제출을 실행하지 않았습니다.
+
+보완 후 실제 A/B 로그인·CRUD·타인 ID 직접 접근·쿠키 응답·만료 후 갱신·배포 파일 키 검사·배포 로그는 재검증 전 미검증입니다. 앞의 7항목을 새 커밋에서 다시 실행한 것으로 기록하지 않습니다. 기존 test:package의 api/notes.js 목록 불일치는 보완 전에도 발생한 시작 틀 기준표 오류입니다.
