@@ -38,6 +38,9 @@ export function notesHandler(detail) {
       if (['POST', 'PUT'].includes(request.method)) {
         try { payload = typeof request.body === 'string' ? JSON.parse(request.body) : request.body; }
         catch { return response.status(400).json({ error: 'INVALID_NOTE' }); }
+        if (payload && Object.hasOwn(payload, 'owner_id')) {
+          return response.status(400).json({ error: 'OWNER_CHANGE_NOT_ALLOWED' });
+        }
         if (!payload || typeof payload.title !== 'string' || !payload.title.trim()
             || payload.title.length > 200 || typeof payload.body !== 'string' || payload.body.length > 10000
             || (request.method === 'POST' && payload.id !== undefined
@@ -63,16 +66,19 @@ export function notesHandler(detail) {
           .json({ error: error.code === '23505' ? 'ID_CONFLICT' : 'NOTES_UNAVAILABLE' });
         return response.status(201).json({ id: newId });
       }
-      // 3단계: 상세 GET·PUT·DELETE의 owner_id 검사는 아직 하지 않습니다.
-      // 신원은 기존 도우미로 검증하며 브라우저 userId·role·owner_id를 믿지 않습니다.
+      // DB가 비교하는 소유자는 기존 도우미가 검증한 ID뿐입니다.
+      // PUT은 owner_id를 입력에서 받지 않고 기존 값을 보존합니다.
       let query = db.from('a02_private_notes');
       if (request.method === 'GET') query = query.select('id,title,content').eq('id', id);
       if (request.method === 'PUT') query = query.update({ title: payload.title.trim(), content: payload.body })
-        .eq('id', id).select('id,title,content');
+        .eq('id', id).select('id,title,content,owner_id');
       if (request.method === 'DELETE') query = query.delete().eq('id', id).select('id');
-      const { data, error } = await query.maybeSingle();
+      const { data, error } = await query.eq('owner_id', identity.userId).maybeSingle();
       if (error) return response.status(502).json({ error: 'NOTES_UNAVAILABLE' });
       if (!data) return response.status(404).json({ error: 'NOTE_NOT_FOUND' });
+      if (request.method === 'PUT' && data.owner_id !== identity.userId) {
+        return response.status(502).json({ error: 'NOTES_UNAVAILABLE' });
+      }
       return response.status(200).json(request.method === 'DELETE' ? { id: data.id } : note(data));
     } catch {
       return response.status(502).json({ error: 'NOTES_UNAVAILABLE' });
