@@ -54,8 +54,8 @@ jobs:
         run: |
           cat > bundle-notes.json <<'EOF'
           {
-            "explanation": "사용자 실제 Preview 검증(3576932 기준): A 로그인, 기존 메모 4건 조회, 시험 메모 추가·수정·삭제, B 자기 메모만 표시, 로그아웃 후 새로고침 시 메모 미표시, auth-config.js 404, data.json 404. 독립 읽기 전용 DB 조회에서 RLS 활성화·소유자 정책 4개·PUBLIC 테이블 권한 없음·anon/authenticated 테이블 7종 및 직접 열 권한 없음·service_role 7종 true를 확인했습니다. 이번 보완 이후 실제 계정 재시험·타인 ID 직접 요청·배포 헤더·만료 후 갱신·로그 비밀값 검사는 미검증입니다. HTTP 자기 점검 대상은 별도 표시하며 Preview 결과를 Production 검증으로 표현하지 않습니다.",
-            "blockedAt": "보완 이후 실제 계정/타인 ID/만료 세션/배포 헤더/로그 재검증; 인증된 사용자 원본 REST 직접 차단 시험 미실행"
+            "explanation": "사용자 실제 Preview 검증(fa8ff72, 1a4w0gmgm 배포): A 기존 메모 4건 조회, 로그인·F5 세션 유지·로그아웃 후 F5 메모 미표시·계정별 분리, auth-ui.js와 notes API nosniff 확인. A에서 B 메모 직접 GET·PUT·DELETE 모두 404, B 재로그인 후 원본 제목·본문 보존 확인. 이전 3576932 Preview에서는 시험 메모 CRUD 및 auth-config.js/data.json 404를 확인했습니다. 사용자 결과와 모의 SDK/DB 회귀 테스트는 구분합니다. 기존 독립 읽기 전용 DB 조회는 RLS 활성화·소유자 정책 4개·PUBLIC 테이블 권한 없음·anon/authenticated 테이블 7종 및 직접 열 권한 없음·service_role 7종 true 확인이며 이번 DB 재검증은 아닙니다. 실제 교차 출처 요청과 만료 세션 처리는 미검증입니다. test:package는 기준 main에도 있는 최상위 api/notes.js 목록 불일치로 실패하며 bundle 선행 검사는 아닙니다. HTTP 자기 점검 대상은 별도 표시하고 Preview 결과를 Production 검증으로 표현하지 않습니다.",
+            "blockedAt": "실제 교차 출처 403/쿠키 미변경·만료 세션 갱신/회수·인증 API 전체/메모 상세 및 오류 응답 헤더·새 Preview 정적 파일 전체 키 검색·로그 비밀값·인증 사용자 원본 REST 직접 차단 미검증; 심판 패키징 규칙 수용 여부 미확인"
           }
           EOF
 

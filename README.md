@@ -166,4 +166,17 @@ Preview에서 직접 확인할 항목: A/B 로그인 후 각자 메모 조회·�
 
 제출 검증 대상: `aleph.config.json.publicAppUrl`은 기존 Production 주소로 보존합니다. 별도 주소 검수 시 `ALEPH_CHECK_APP_URL` 또는 Actions의 `check_app_url`에 해당 Preview 루트 HTTPS 주소를 지정합니다. stage5-server-auth Actions에서는 주소를 반드시 입력합니다. 각 observed와 설명에 실제 HTTP 요청 대상을 기록합니다. changedFiles는 계속 HEAD 한 커밋의 변경 파일이며 임의 합산하지 않습니다. 워크플로 기준 SHA는 실행한 브랜치의 이력에 포함되어야 합니다. Preview 실행 성공은 Production 검증·최종 제출 성공을 의미하지 않습니다. 이번 작업에서는 bundle과 최종 제출을 실행하지 않았습니다.
 
-보완 후 실제 A/B 로그인·CRUD·타인 ID 직접 접근·쿠키 응답·만료 후 갱신·배포 파일 키 검사·배포 로그는 재검증 전 미검증입니다. 앞의 7항목을 새 커밋에서 다시 실행한 것으로 기록하지 않습니다. 기존 test:package의 api/notes.js 목록 불일치는 보완 전에도 발생한 시작 틀 기준표 오류입니다.
+### fa8ff72 Preview 추가 실제 검증 (사용자 확인)
+
+대상 커밋: `fa8ff72ca74ec6633ba03030f93ca5371745588c`.
+대상 Preview: https://choi-bujang-secret-vault-1a4w0gmgm-jyp13.vercel.app/
+
+- `auth-ui.js`와 메모 `notes` API의 실제 응답에 `X-Content-Type-Options: nosniff` 확인.
+- A 계정에서 B 소유 메모 ID에 직접 GET·PUT·DELETE 요청 시 모두 404 확인. B 재로그인 후 원본 제목·본문 보존 확인.
+- 로그인·메모 조회·F5 후 세션 유지·로그아웃 후 F5 시 메모 미표시·계정별 메모 분리 확인. A의 기존 메모 4건 조회 확인.
+
+위 결과는 사용자가 실제 Preview에서 확인한 기록이며 도구가 독립 재실행한 결과나 Production 검증이 아닙니다. 이전 3576932의 시험 메모 CRUD와 두 정적 경로 404는 해당 이전 커밋 결과로 유지합니다.
+
+모의 회귀 테스트는 SDK·DB 대역으로 쿠키 보안 속성, 만료/refresh 전용 세션 처리, 교차 출처 거부와 쿠키 미변경, Bearer 호환성, 소유권 검사를 확인합니다. 실제 교차 출처 세션 GET의 403·쿠키 미변경과 실제 만료 세션 갱신·회수는 미검증입니다. 인증 API 전체 및 메모 상세/모든 오류 응답의 실제 nosniff 헤더, 새 Preview 정적 파일 전체의 키 검색, 배포 로그 비밀값 검사, 인증 사용자 원본 REST 직접 차단도 미검증입니다. 독립 DB 권한 조회는 위 기록 시점 결과이며 DB를 변경하거나 재검증하지 않았습니다.
+
+`test:package`는 시작 틀 기준표가 최상위 API를 `api/ai.js`, `api/threat-intel.js`로 제한하지만 실제 목록에 `api/notes.js`가 있어 실패합니다. 기준 main 8080024에서도 같은 실패가 발생하며 이번 문서 변경에서 비롯된 실패가 아닙니다. 인증·상세 API 하위 폴더는 이 검사가 재귀 검사하지 않습니다. package.json과 제출 워크플로는 이 검사를 bundle 선행 조건으로 실행하지 않으므로 직접적인 번들 생성 차단 원인은 아닙니다. 다만 전체 테스트 통과로 보고할 수 없으며 심판의 패키징 규칙 수용 여부는 미확인입니다. 이번 작업에서는 bundle·최종 제출을 실행하지 않습니다.
