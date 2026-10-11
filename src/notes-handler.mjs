@@ -1,0 +1,81 @@
+import { createClient } from '@supabase/supabase-js';
+import { readFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { createLoginVerifier } from './verify-login.mjs';
+
+const config = JSON.parse(readFileSync(new URL('../aleph.config.json', import.meta.url), 'utf8'));
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+let verifyLogin;
+const note = row => ({ id: row.id, title: row.title, body: row.content });
+
+export function notesHandler(detail) {
+  return async (request, response) => {
+    response.setHeader('Cache-Control', 'no-store');
+    const methods = detail ? ['GET', 'PUT', 'DELETE'] : ['GET', 'POST'];
+    if (!methods.includes(request.method)) {
+      response.setHeader('Allow', methods.join(', '));
+      return response.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
+    }
+    const authorization = request.headers?.authorization;
+    if (typeof authorization !== 'string' || !authorization) {
+      return response.status(401).json({ error: 'LOGIN_REQUIRED' });
+    }
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SECRET_KEY;
+    if (!url || !key) return response.status(503).json({ error: 'NOTES_UNAVAILABLE' });
+    try {
+      if (new URL(url).origin !== new URL(config.identityProvider.issuer).origin) {
+        return response.status(503).json({ error: 'NOTES_UNAVAILABLE' });
+      }
+      verifyLogin ??= createLoginVerifier({ config, supabaseSecretKey: key });
+      const identity = await verifyLogin(authorization);
+      if (!identity) return response.status(401).json({ error: 'LOGIN_REQUIRED' });
+      const id = detail ? request.query?.id : undefined;
+      if (detail && (typeof id !== 'string' || !UUID.test(id))) {
+        return response.status(400).json({ error: 'INVALID_ID' });
+      }
+      let payload;
+      if (['POST', 'PUT'].includes(request.method)) {
+        try { payload = typeof request.body === 'string' ? JSON.parse(request.body) : request.body; }
+        catch { return response.status(400).json({ error: 'INVALID_NOTE' }); }
+        if (!payload || typeof payload.title !== 'string' || !payload.title.trim()
+            || payload.title.length > 200 || typeof payload.body !== 'string' || payload.body.length > 10000
+            || (request.method === 'POST' && payload.id !== undefined
+                && (typeof payload.id !== 'string' || !UUID.test(payload.id)))) {
+          return response.status(400).json({ error: 'INVALID_NOTE' });
+        }
+      }
+      const db = createClient(url, key, {
+        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      });
+      if (!detail && request.method === 'GET') {
+        const { data, error } = await db.from('a02_private_notes')
+          .select('id,title,content').eq('owner_id', identity.userId).order('created_at', { ascending: true }).order('id');
+        if (error) return response.status(502).json({ error: 'NOTES_UNAVAILABLE' });
+        return response.status(200).json(data.map(note));
+      }
+      if (request.method === 'POST') {
+        const newId = payload.id ?? randomUUID();
+        const { error } = await db.from('a02_private_notes').insert({
+          id: newId, owner_id: identity.userId, title: payload.title.trim(), content: payload.body,
+        });
+        if (error) return response.status(error.code === '23505' ? 409 : 502)
+          .json({ error: error.code === '23505' ? 'ID_CONFLICT' : 'NOTES_UNAVAILABLE' });
+        return response.status(201).json({ id: newId });
+      }
+      // 3단계: 상세 GET·PUT·DELETE의 owner_id 검사는 아직 하지 않습니다.
+      // 신원은 기존 도우미로 검증하며 브라우저 userId·role·owner_id를 믿지 않습니다.
+      let query = db.from('a02_private_notes');
+      if (request.method === 'GET') query = query.select('id,title,content').eq('id', id);
+      if (request.method === 'PUT') query = query.update({ title: payload.title.trim(), content: payload.body })
+        .eq('id', id).select('id,title,content');
+      if (request.method === 'DELETE') query = query.delete().eq('id', id).select('id');
+      const { data, error } = await query.maybeSingle();
+      if (error) return response.status(502).json({ error: 'NOTES_UNAVAILABLE' });
+      if (!data) return response.status(404).json({ error: 'NOTE_NOT_FOUND' });
+      return response.status(200).json(request.method === 'DELETE' ? { id: data.id } : note(data));
+    } catch {
+      return response.status(502).json({ error: 'NOTES_UNAVAILABLE' });
+    }
+  };
+}
