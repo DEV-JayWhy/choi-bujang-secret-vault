@@ -1,11 +1,10 @@
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from './auth-config.js';
 const status = document.querySelector('#auth-status');
 const message = document.querySelector('#auth-message');
 const form = document.querySelector('#login-form');
 const login = document.querySelector('#login-button');
 const logout = document.querySelector('#logout-button');
 const password = document.querySelector('#password');
-let client;
+
 const list = document.querySelector('#notes');
 let generation = 0;
 let currentSession = null;
@@ -22,14 +21,19 @@ function resetEditor() {
   document.querySelector('#editor-heading').textContent = '메모 추가'; cancelNote.hidden = true;
 }
 async function notesRequest(path, method = 'GET', body) {
-  const { data, error } = await client.auth.getSession();
-  if (error || !data.session?.access_token) throw new Error('로그인이 필요합니다.');
-  const response = await fetch(path, {
-    method, cache: 'no-store', headers: { Authorization: `Bearer ${data.session.access_token}`,
-      ...(body ? { 'Content-Type': 'application/json' } : {}) },
+  let response = await fetch(path, {
+    method, cache: 'no-store', credentials: 'same-origin',
+    headers: body ? { 'Content-Type': 'application/json' } : {},
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
-  if (response.status === 401) throw new Error('로그인을 다시 확인해 주세요.');
+  if (response.status === 401) {
+    refreshPending ??= authRequest('session').finally(() => { refreshPending = null; });
+    const session = await refreshPending;
+    if (!session.user) { render(null); throw new Error('다시 로그인해 주세요.'); }
+    response = await fetch(path, { method, cache: 'no-store', credentials: 'same-origin',
+      headers: body ? { 'Content-Type': 'application/json' } : {},
+      ...(body ? { body: JSON.stringify(body) } : {}) });
+  }
   if (response.status === 404) throw new Error('메모가 없거나 삭제되었습니다.');
   if (response.status === 409) throw new Error('같은 ID의 메모가 이미 있습니다.');
   if (!response.ok) throw new Error('메모 요청을 처리하지 못했습니다.');
@@ -38,7 +42,7 @@ async function notesRequest(path, method = 'GET', body) {
 async function loadNotes(session) {
   const current = ++generation;
   list.replaceChildren();
-  if (!session?.access_token) { list.textContent = '로그인하면 메모를 표시합니다.'; return; }
+  if (!session?.user) { list.textContent = '로그인하면 메모를 표시합니다.'; return; }
   list.textContent = '메모를 불러오는 중입니다.';
   try {
     const data = await notesRequest('/api/notes');
@@ -112,42 +116,30 @@ function reason(error) {
   };
   return reasons[error?.code] ?? error?.message ?? '연결을 확인한 뒤 다시 시도해 주세요.';
 }
-try {
-  if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) throw new Error('auth-config.js에 Project URL과 공개 publishable key를 입력해 주세요.');
-  if (!window.supabase?.createClient) throw new Error('로그인 SDK를 불러오지 못했습니다. 네트워크 연결을 확인해 주세요.');
-  client = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
-  client.auth.onAuthStateChange((_event, session) => render(session));
-  const { data, error } = await client.auth.getSession();
-  if (error) throw error;
-  render(data.session);
-  login.disabled = false;
-} catch (error) {
-  status.textContent = '로그인 설정을 확인해 주세요.';
-  message.textContent = reason(error);
+let refreshPending;
+async function authRequest(action, body) {
+  const response = await fetch(`/api/auth/${action}`, {
+    method: action === 'session' ? 'GET' : 'POST', cache: 'no-store', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  const data = await response.json();
+  if (action === 'session' && response.status === 401) return { user: null };
+  if (!response.ok) throw { code: data.error };
+  return data;
 }
-form.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  if (!client) return;
-  login.disabled = true;
-  message.textContent = '';
+try { render(await authRequest('session')); login.disabled = false; }
+catch { status.textContent = '로그인 서버에 연결하지 못했습니다.'; login.disabled = false; }
+form.addEventListener('submit', async event => {
+  event.preventDefault(); login.disabled = true; message.textContent = '';
   try {
-    const { data, error } = await client.auth.signInWithPassword({
-      email: document.querySelector('#email').value.trim(), password: password.value,
-    });
-    if (error) { message.textContent = `로그인 실패: ${reason(error)}`; return; }
-    render(data.session);
+    render(await authRequest('login', { email: document.querySelector('#email').value.trim(), password: password.value }));
     message.textContent = '로그인했습니다.';
   } catch (error) { message.textContent = `로그인 실패: ${reason(error)}`; }
   finally { password.value = ''; login.disabled = false; }
 });
 logout.addEventListener('click', async () => {
-  logout.disabled = true;
-  message.textContent = '';
-  try {
-    const { error } = await client.auth.signOut();
-    if (error) { message.textContent = `로그아웃 실패: ${reason(error)}`; return; }
-    render(null);
-    message.textContent = '로그아웃했습니다.';
-  } catch (error) { message.textContent = `로그아웃 실패: ${reason(error)}`; }
+  logout.disabled = true; message.textContent = '';
+  try { await authRequest('logout'); render(null); message.textContent = '로그아웃했습니다.'; }
+  catch (error) { render(null); message.textContent = `로그아웃 처리 확인 필요: ${reason(error)}`; }
   finally { logout.disabled = false; }
 });

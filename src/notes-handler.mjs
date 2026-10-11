@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import { cookieToken, sameOrigin } from './server-auth.mjs';
 import { createLoginVerifier } from './verify-login.mjs';
 
 const config = JSON.parse(readFileSync(new URL('../aleph.config.json', import.meta.url), 'utf8'));
@@ -16,7 +17,12 @@ export function notesHandler(detail) {
       response.setHeader('Allow', methods.join(', '));
       return response.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
     }
-    const authorization = request.headers?.authorization;
+    const bearer = request.headers?.authorization;
+    const token = bearer ? null : cookieToken(request);
+    if (token && request.method !== 'GET' && !sameOrigin(request)) {
+      return response.status(403).json({ error: 'ORIGIN_DENIED' });
+    }
+    const authorization = bearer || (token ? `Bearer ${token}` : undefined);
     if (typeof authorization !== 'string' || !authorization) {
       return response.status(401).json({ error: 'LOGIN_REQUIRED' });
     }

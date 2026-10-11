@@ -11,6 +11,7 @@ if (!Number.isInteger(config.step) || config.step < 2) {
 await mkdir(resolve(root, 'public'), { recursive: true });
 // 이전 빌드에서 남은 공개 자료도 제거합니다.
 await rm(output, { force: true });
+await rm(resolve(root, 'public', 'auth-config.js'), { force: true });
 if (!process.argv.includes('--local')) {
   const identity = deploymentIdentity(process.env, config);
   await writeFile(resolve(root, 'public', 'aleph.json'),

@@ -134,3 +134,17 @@ api/notes.js에서 시작 틀의 src/verify-login.mjs의 createLoginVerifier를 
 재실행: `node --test test/notes-ownership.test.mjs`, `npm run build -- --local`, 저장점 커밋 후 로컬 전용 bundle-notes.json을 작성하고 `npm run bundle`. 화면에서 A/B 각각 로그인하여 자기 메모 추가·수정·삭제를 확인하고 상대 UUID 접근은 404, owner_id 변경 요청은 400인지 확인합니다. 모의 테스트와 실제 심판 판정은 별개입니다.
 
 번들 자기 점검은 현재 배포에 무로그인 CRUD·잘못된 토큰·data.json의 7개 요청을 실제로 보냅니다. 실제 A/B 토큰이나 DB 관리자 연결이 없는 소유권·RLS 점검은 미실행으로 기록하며 사용자 검증을 독립 실행으로 바꾸지 않습니다. 로컬 저장점 커밋과 GitHub 반영·배포는 각각 별도로 확인해야 합니다.
+
+## 5단계 가점용 별도 브랜치: 서버 로그인
+
+기준 커밋은 `808002445276e35676abeef644e844a004743c37`이며 `stage5-server-auth`에서만 작업합니다. main 병합과 운영 배포 전환은 하지 않습니다. 이전 단계 기록은 당시 결과이며, 이 변경의 실제 A/B 계정 로그인은 아직 미검증입니다.
+
+브라우저의 Supabase 공개 키 설정 파일과 CDN SDK를 제거했습니다. 로그인은 `POST /api/auth/login`, 세션 확인·만료 시 SDK 갱신은 `GET /api/auth/session`, 로그아웃은 `POST /api/auth/logout`을 사용합니다. 서버는 기존 `SUPABASE_URL`, `SUPABASE_SECRET_KEY`만 사용합니다. Preview에도 두 변수가 설정되어 있어야 하며 값 자체를 공유하지 않습니다. SDK `signInWithPassword`, `getUser`, `refreshSession`, `admin.signOut`을 사용하고, 응답 JSON에는 사용자 ID·이메일만 포함합니다. 토큰은 Secure·HttpOnly·SameSite=Strict·Path=/인 호스트 전용 쿠키에 저장합니다.
+
+메모 API는 쿠키 토큰을 기존 `src/verify-login.mjs`로 검증합니다. 기존 Bearer 요청·심판 토큰 검증·소유자 필터·RLS·서버 DB 설정은 유지합니다. 쿠키를 사용하는 변경 요청과 로그인·로그아웃은 현재 배포 호스트의 Origin을 검사합니다. Vercel의 `VERCEL_URL`과 `VERCEL_BRANCH_URL`을 Preview 허용 호스트로 사용합니다.
+
+실행: `node --test test/server-auth.test.mjs test/notes-cookie.test.mjs test/notes-ownership.test.mjs test/r5.test.mjs` 및 `npm run build -- --local`. 모의 SDK 로그인 실패·로그인·세션 갱신·로그아웃, 쿠키 보안 속성, 응답 토큰 미포함, 교차 Origin 거부, A/B CRUD·타인 메모 404·소유자 위조 거부, public 전체 키/토큰/SDK/저장소 문자열 검사는 통과했습니다. 이 결과는 실제 계정·실제 DB 검증이 아닙니다. `npm run test:package`의 시작 틀 API 목록 검사는 기준 커밋에서도 `api/notes.js` 때문에 실패함을 재현했으며 이번 범위에서 수정하지 않았습니다.
+
+Preview에서 직접 확인할 항목: A/B 로그인 후 각자 메모 조회·추가·수정·삭제, 로그아웃 후 자료 거부, 새로고침·토큰 만료 후 세션 갱신, B의 A 메모 GET/PUT/DELETE 404. 브라우저 Network에서 자료 요청이 같은 호스트 `/api/notes`로만 가고 공개 키가 없는지 확인합니다. `/auth-config.js`와 `/data.json`은 404여야 합니다.
+
+남은 위험: 과거 공개 커밋·과거 배포의 공개 키는 삭제되지 않습니다. 공개 키 제거는 DB 권한·소유자 검사에 대한 대체 수단이 아닙니다. 인증 함수는 공개 주소이며 별도의 앱 로그인 요청 제한을 추가하지 않았습니다. HttpOnly는 토큰 읽기를 제한하지만 XSS가 같은 출처 요청을 보내는 위험은 남습니다. SDK 로그아웃이 갱신 세션을 회수해도 이미 발급된 JWT는 만료까지 유효할 수 있습니다. 여러 탭의 동시 갱신·실제 A/B 계정·Preview 환경변수 설정은 실제 환경에서 별도로 확인해야 합니다. 100점 여부는 심판 평가 미확인입니다.
