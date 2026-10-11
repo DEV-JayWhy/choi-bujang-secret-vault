@@ -2,6 +2,12 @@ name: ALEPH Defense Bundle
 
 on:
   workflow_dispatch:
+    inputs:
+      target_commit:
+        description: 'Submission baseline: full 40-character commit SHA (changedFiles is this commit only)'
+        required: true
+        default: 'e6b3eff8a4e447fcaede0f6b97e769df9921cdeb'
+        type: string
 
 permissions:
   contents: read
@@ -12,6 +18,20 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Select and verify submission baseline
+        env:
+          TARGET_COMMIT: ${{ inputs.target_commit }}
+        run: |
+          [[ "$TARGET_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse --is-shallow-repository)" = false
+          git merge-base --is-ancestor "$TARGET_COMMIT" origin/main
+          git checkout --detach "$TARGET_COMMIT"
+          test "$(git rev-parse HEAD)" = "$TARGET_COMMIT"
+          git log -1 --format='%H %s'
+          git diff-tree --root --no-commit-id --name-only --no-renames -r HEAD
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -33,6 +53,24 @@ jobs:
 
       - name: Generate submission bundle
         run: npm run bundle
+
+      - name: Verify submission commit and changedFiles
+        env:
+          TARGET_COMMIT: ${{ inputs.target_commit }}
+        run: |
+          node --input-type=module <<'JS'
+          import { readFileSync } from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          import assert from 'node:assert/strict';
+          const bundle = JSON.parse(readFileSync('artifacts/submission.json', 'utf8'));
+          const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
+          assert.equal(bundle.commit, process.env.TARGET_COMMIT);
+          assert.equal(bundle.commit, git('rev-parse', 'HEAD'));
+          const files = git('diff-tree', '--root', '--no-commit-id', '--name-only', '--no-renames', '-r', 'HEAD').split(/\r?\n/).filter(Boolean).sort();
+          assert.deepEqual(bundle.changedFiles, files);
+          assert.equal(bundle.step, 4);
+          console.log('Verified submission baseline:', bundle.commit, 'changedFiles:', files.length);
+          JS
 
       - name: Print submission JSON
         run: cat artifacts/submission.json
