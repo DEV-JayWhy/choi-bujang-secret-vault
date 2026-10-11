@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       target_commit:
-        description: 'Submission baseline: full 40-character commit SHA (changedFiles is this commit only)'
-        required: true
-        default: 'e6b3eff8a4e447fcaede0f6b97e769df9921cdeb'
+        description: 'Submission baseline: optional full SHA; blank uses workflow commit (changedFiles is this commit only)'
+        required: false
+        default: ''
         type: string
 
 permissions:
@@ -23,7 +23,7 @@ jobs:
 
       - name: Select and verify submission baseline
         env:
-          TARGET_COMMIT: ${{ inputs.target_commit }}
+          TARGET_COMMIT: ${{ inputs.target_commit || github.sha }}
         run: |
           [[ "$TARGET_COMMIT" =~ ^[0-9a-f]{40}$ ]]
           test "$(git rev-parse --is-shallow-repository)" = false
@@ -46,8 +46,8 @@ jobs:
         run: |
           cat > bundle-notes.json <<'EOF'
           {
-            "explanation": "4단계 API 소유권 검사와 사용자 보고에 따른 RLS·최소 권한 적용 상태를 기록했습니다. 실제 비로그인 API 점검과 사용자 보고에 따른 소유권 검증 결과를 구분했습니다. 실제 A/B 계정 및 DB 권한의 독립 재검증은 수행하지 않았습니다.",
-            "blockedAt": "실제 A/B 계정 접근과 DB 소유자 RLS의 독립 재검증"
+            "explanation": "5단계 브라우저 코드 점검에서 메모 CRUD의 Supabase 직접 호출이 없고 기존 서버 함수만 호출함을 확인했습니다. 공개 publishable 키로 원본 REST GET을 실제 실행해 HTTP 401·42501 권한 거부와 메모 미반환을 확인했습니다. 기존 소유권 모의 CRUD 테스트는 통과했으며 실제 A 로그인 CRUD 및 B 접근의 이번 독립 재검증은 수행하지 않았습니다. 인증된 사용자 JWT 원본 GET·수정 요청은 세션 부재로 미실행입니다. DB 권한·RLS 적용 상태는 사용자 보고와 독립 검증을 구분하며 이번 준비에서 DB 재검증과 번들 실행은 하지 않았습니다.",
+            "blockedAt": "실제 A/B 로그인 동작, 인증된 사용자 원본 API 접근·수정 및 DB 권한의 독립 재검증"
           }
           EOF
 
@@ -56,7 +56,7 @@ jobs:
 
       - name: Verify submission commit and changedFiles
         env:
-          TARGET_COMMIT: ${{ inputs.target_commit }}
+          TARGET_COMMIT: ${{ inputs.target_commit || github.sha }}
         run: |
           node --input-type=module <<'JS'
           import { readFileSync } from 'node:fs';
@@ -68,7 +68,7 @@ jobs:
           assert.equal(bundle.commit, git('rev-parse', 'HEAD'));
           const files = git('diff-tree', '--root', '--no-commit-id', '--name-only', '--no-renames', '-r', 'HEAD').split(/\r?\n/).filter(Boolean).sort();
           assert.deepEqual(bundle.changedFiles, files);
-          assert.equal(bundle.step, 4);
+          assert.equal(bundle.step, 5);
           console.log('Verified submission baseline:', bundle.commit, 'changedFiles:', files.length);
           JS
 
@@ -78,6 +78,6 @@ jobs:
       - name: Upload submission JSON
         uses: actions/upload-artifact@v4
         with:
-          name: aleph-step4-submission
+          name: aleph-step5-submission
           path: artifacts/submission.json
           if-no-files-found: error
