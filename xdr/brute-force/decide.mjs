@@ -64,10 +64,30 @@ export function decide(alert) {
   const accounts = typeof alert?.data?.accounts === 'string'
     ? new Set(alert.data.accounts.split(',').map(s => s.trim()).filter(Boolean)).size : 0;
 
+  const describedAccounts = [...description.matchAll(/계정\s*(\d+)\s*개/gu)]
+    .map(m => positiveInteger(m[1]));
+  const accountCount = describedAccounts.length === 1 ? describedAccounts[0] : accounts;
+  const continuous = /연속|이어/u.test(description);
+  const noSuccess = /성공은\s*없/u.test(description);
+
   let confidence = 0.1;
   let pattern = PATTERNS[0];
   let rationale = '일치 근거 부족 또는 정상 이벤트';
-  if (source && spraying) {
+  if (source && account && spraying && continuous && accountCount >= 5
+      && (failure || /넣었|대입|시도/u.test(description))) {
+    pattern = PATTERNS[2];
+    confidence = 0.9;
+    rationale = '설명상 연속 다계정 동일 비밀번호 시도와 계정 수 일치; 동일 비밀번호 독립 확인은 미완료';
+  } else if (source && failure && sameSource && accountCount >= 10
+      && /같은 간격/u.test(description)) {
+    confidence = 0.9;
+    rationale = '같은 주소의 다계정 실패와 일정한 간격 결합; 총 시간은 미확인';
+  } else if (source && account && failure && count !== null && count >= 50
+      && ((sameSource && sameAccount && continuous) || noSuccess)) {
+    pattern = PATTERNS[1];
+    confidence = 0.9;
+    rationale = '고횟수 실패와 동일 주소·계정 연속성 또는 성공 없음 결합; 시간은 미확인';
+  } else if (source && spraying) {
     pattern = PATTERNS[2];
     confidence = 0.75;
     rationale = '경보 설명상 의심; 동일 비밀번호 독립 확인 불가';

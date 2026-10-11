@@ -10,9 +10,9 @@
     },
     {
       "alertId": "bf-02",
-      "action": "alert",
-      "confidence": 0.75,
-      "reason": "여러 계정 대상 Password Spraying 의심: 경보 설명상 의심; 동일 비밀번호 독립 확인 불가"
+      "action": "block",
+      "confidence": 0.9,
+      "reason": "여러 계정 대상 Password Spraying 의심: 설명상 연속 다계정 동일 비밀번호 시도와 계정 수 일치; 동일 비밀번호 독립 확인은 미완료"
     },
     {
       "alertId": "bf-03",
@@ -24,13 +24,13 @@
       "alertId": "bf-04",
       "action": "block",
       "confidence": 0.9,
-      "reason": "같은 계정에 대한 반복 비밀번호 추측 의심: 한 계정의 단시간 다수 실패와 성공 없음의 결합"
+      "reason": "같은 계정에 대한 반복 비밀번호 추측 의심: 고횟수 실패와 동일 주소·계정 연속성 또는 성공 없음 결합; 시간은 미확인"
     },
     {
       "alertId": "bf-05",
-      "action": "alert",
-      "confidence": 0.55,
-      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 실패 신호는 있으나 단시간 반복 조건 부족"
+      "action": "block",
+      "confidence": 0.9,
+      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 같은 주소의 다계정 실패와 일정한 간격 결합; 총 시간은 미확인"
     },
     {
       "alertId": "bf-06",
@@ -46,21 +46,21 @@
     },
     {
       "alertId": "bf-08",
-      "action": "alert",
-      "confidence": 0.55,
-      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 실패 신호는 있으나 단시간 반복 조건 부족"
+      "action": "block",
+      "confidence": 0.9,
+      "reason": "같은 계정에 대한 반복 비밀번호 추측 의심: 고횟수 실패와 동일 주소·계정 연속성 또는 성공 없음 결합; 시간은 미확인"
     },
     {
       "alertId": "bf-09",
-      "action": "alert",
-      "confidence": 0.75,
-      "reason": "여러 계정 대상 Password Spraying 의심: 경보 설명상 의심; 동일 비밀번호 독립 확인 불가"
+      "action": "block",
+      "confidence": 0.9,
+      "reason": "여러 계정 대상 Password Spraying 의심: 설명상 연속 다계정 동일 비밀번호 시도와 계정 수 일치; 동일 비밀번호 독립 확인은 미완료"
     },
     {
       "alertId": "bf-10",
-      "action": "alert",
-      "confidence": 0.55,
-      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 실패 신호는 있으나 단시간 반복 조건 부족"
+      "action": "block",
+      "confidence": 0.9,
+      "reason": "같은 계정에 대한 반복 비밀번호 추측 의심: 고횟수 실패와 동일 주소·계정 연속성 또는 성공 없음 결합; 시간은 미확인"
     },
     {
       "alertId": "bf-11",
@@ -172,8 +172,8 @@
     }
   ],
   "counts": {
-    "block": 5,
-    "alert": 14,
+    "block": 10,
+    "alert": 9,
     "record": 9
   }
 }
