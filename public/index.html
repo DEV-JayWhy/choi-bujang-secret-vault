@@ -24,8 +24,22 @@
     <h1>내 자료실</h1>
     <p>공개 파일에서 메모를 제거했습니다.</p>
     <div class="notice">메모는 서버 함수를 통해 DB에서 읽습니다. 아직 로그인 없이 API에 접근할 수 있는 단계입니다.</div>
+    <section aria-label="계정 로그인" style="margin:24px 0;padding:20px;border:1px solid #51667c;border-radius:14px">
+      <p id="auth-status" role="status" aria-live="polite">로그인 상태 확인 중…</p>
+      <form id="login-form">
+        <label for="email">이메일</label>
+        <input id="email" type="email" autocomplete="username" required style="display:block;margin:8px 0 16px;padding:10px;max-width:100%;box-sizing:border-box">
+        <label for="password">비밀번호</label>
+        <input id="password" type="password" autocomplete="current-password" required style="display:block;margin:8px 0 16px;padding:10px;max-width:100%;box-sizing:border-box">
+        <button id="login-button" type="submit" disabled>로그인</button>
+      </form>
+      <button id="logout-button" type="button" hidden>로그아웃</button>
+      <p id="auth-message" role="alert" aria-live="polite"></p>
+    </section>
     <ul id="notes" aria-live="polite"><li>가상 자료를 불러오는 중입니다.</li></ul>
   </main>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
+  <script type="module" src="/auth-ui.js"></script>
   <script type="module">
     const list = document.querySelector('#notes');
     try {
