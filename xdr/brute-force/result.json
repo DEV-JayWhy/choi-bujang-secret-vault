@@ -1,0 +1,179 @@
+{
+  "schema": "aleph.xdr.result.v1",
+  "moduleKey": "brute-force",
+  "decisions": [
+    {
+      "alertId": "bf-01",
+      "action": "block",
+      "confidence": 0.9,
+      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 같은 주소·단시간·실패 횟수의 자체 기준 일치"
+    },
+    {
+      "alertId": "bf-02",
+      "action": "alert",
+      "confidence": 0.75,
+      "reason": "여러 계정 대상 Password Spraying 의심: 경보 설명상 의심; 동일 비밀번호 독립 확인 불가"
+    },
+    {
+      "alertId": "bf-03",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 실패 신호는 있으나 단시간 반복 조건 부족"
+    },
+    {
+      "alertId": "bf-04",
+      "action": "alert",
+      "confidence": 0.75,
+      "reason": "같은 계정에 대한 반복 비밀번호 추측 의심: 계정 반복 실패 의심; 같은 주소 반복 명시 부족"
+    },
+    {
+      "alertId": "bf-05",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 실패 신호는 있으나 단시간 반복 조건 부족"
+    },
+    {
+      "alertId": "bf-06",
+      "action": "block",
+      "confidence": 0.9,
+      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 같은 주소·단시간·실패 횟수의 자체 기준 일치"
+    },
+    {
+      "alertId": "bf-07",
+      "action": "alert",
+      "confidence": 0.75,
+      "reason": "같은 계정에 대한 반복 비밀번호 추측 의심: 설명상 반복 추측 의심; 비밀번호·집계 조건 독립 확인 불가"
+    },
+    {
+      "alertId": "bf-08",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 실패 신호는 있으나 단시간 반복 조건 부족"
+    },
+    {
+      "alertId": "bf-09",
+      "action": "alert",
+      "confidence": 0.75,
+      "reason": "여러 계정 대상 Password Spraying 의심: 경보 설명상 의심; 동일 비밀번호 독립 확인 불가"
+    },
+    {
+      "alertId": "bf-10",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 실패 신호는 있으나 단시간 반복 조건 부족"
+    },
+    {
+      "alertId": "bf-11",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 실패 신호는 있으나 단시간 반복 조건 부족"
+    },
+    {
+      "alertId": "bf-12",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 실패 신호는 있으나 단시간 반복 조건 부족"
+    },
+    {
+      "alertId": "bf-13",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 실패 신호는 있으나 단시간 반복 조건 부족"
+    },
+    {
+      "alertId": "bf-14",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 실패 신호는 있으나 단시간 반복 조건 부족"
+    },
+    {
+      "alertId": "bf-15",
+      "action": "alert",
+      "confidence": 0.5,
+      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 실패 신호는 있으나 단시간 반복 조건 부족"
+    },
+    {
+      "alertId": "bf-16",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 실패 신호는 있으나 단시간 반복 조건 부족"
+    },
+    {
+      "alertId": "bf-17",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 실패 신호는 있으나 단시간 반복 조건 부족"
+    },
+    {
+      "alertId": "bf-18",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 실패 신호는 있으나 단시간 반복 조건 부족"
+    },
+    {
+      "alertId": "bf-19",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 실패 신호는 있으나 단시간 반복 조건 부족"
+    },
+    {
+      "alertId": "bf-20",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 일치 근거 부족 또는 정상 이벤트"
+    },
+    {
+      "alertId": "bf-21",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 일치 근거 부족 또는 정상 이벤트"
+    },
+    {
+      "alertId": "bf-22",
+      "action": "record",
+      "confidence": 0.2,
+      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 소수 실패; 반복 공격 근거 부족"
+    },
+    {
+      "alertId": "bf-23",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 일치 근거 부족 또는 정상 이벤트"
+    },
+    {
+      "alertId": "bf-24",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 일치 근거 부족 또는 정상 이벤트"
+    },
+    {
+      "alertId": "bf-25",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 일치 근거 부족 또는 정상 이벤트"
+    },
+    {
+      "alertId": "bf-26",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 일치 근거 부족 또는 정상 이벤트"
+    },
+    {
+      "alertId": "bf-27",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 일치 근거 부족 또는 정상 이벤트"
+    },
+    {
+      "alertId": "bf-28",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "같은 출발 IP의 단시간 로그인 실패 반복: 일치 근거 부족 또는 정상 이벤트"
+    }
+  ],
+  "counts": {
+    "block": 2,
+    "alert": 17,
+    "record": 9
+  }
+}
