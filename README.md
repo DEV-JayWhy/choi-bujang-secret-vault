@@ -90,3 +90,23 @@ api/notes.js에서 시작 틀의 src/verify-login.mjs의 createLoginVerifier를 
 이번 단계는 신원 확인까지만 구현합니다. 로그인한 사용자별 owner_id 제한은 아직 없으므로 유효한 로그인 사용자는 현재 메모 전체를 읽습니다. 로그아웃 화면 처리는 탈취된 기존 JWT의 즉시 무효화를 증명하지 않습니다. 이전 README의 공개 API 결과는 변경 전 시점 기록이며 과거 공개 커밋·배포의 노출도 해소됐다고 주장하지 않습니다.
 
 실행: `npm run build -- --local`. GitHub 반영 및 Vercel 재배포 후 시크릿 창에서 메모가 안 보이는지, /api/notes를 직접 열면 401이고 notes 필드가 없는지 확인합니다. A 계정 로그인 후 4개 카드, 로그아웃 후 메모 없음 상태를 확인합니다. 잘못된 토큰도 401이어야 합니다. 실제 A 계정·배포 검증은 미실행이며 서버 전용 키는 기존 Vercel 환경변수에서만 읽습니다.
+
+## 3단계 제작 3: 인증된 메모 CRUD (미배포)
+
+먼저 Supabase SQL Editor에서 `sql/03_notes_uuid.sql`을 실행합니다. 기존 숫자 id를 결정적인 UUID로 바꾸고 기존 행·owner_id·RLS·권한을 보존합니다. UUID 전환은 기존 숫자 ID URL을 바꾸므로 이후에는 UUID URL만 사용합니다. id가 이미 UUID이면 다시 변환하지 않습니다. 기존 가상 메모 4건의 owner_id가 NULL이면 내 메모 목록에 표시되지 않으며 삭제하지 않습니다. A가 추가한 메모부터 A 목록에 표시됩니다. 실제 DB 마이그레이션은 미실행입니다.
+
+| 메서드·경로 | 요청 | 성공 응답 |
+| --- | --- | --- |
+| GET /api/notes | 없음 | 로그인 사용자 owner_id의 메모 배열 [{id,title,body}] |
+| POST /api/notes | {id?,title,body}, id는 UUID | 201 {id}; 생략하면 서버 UUID 생성 |
+| GET /api/notes/:id | UUID 경로 | 200 {id,title,body}, 없으면 404 |
+| PUT /api/notes/:id | {title,body} | 200 {id,title,body}, 없으면 404 |
+| DELETE /api/notes/:id | UUID 경로 | 200 {id}, 없으면 404 |
+
+위 경로를 aleph.config.json.allowedRoutes에 기록했습니다. Vercel의 api/notes.js와 api/notes/[id].js가 각각 목록 및 상세 경로를 담당합니다. DB의 content를 API body로 변환하며 프런트 목록도 배열 응답에 맞췄습니다. 메모 제목·본문은 textContent로 표시합니다.
+
+모든 CRUD는 원본 src/verify-login.mjs로 토큰을 검증합니다. 도우미를 수정하지 않았습니다. 무토큰·잘못된 토큰은 자료 없이 401입니다. POST owner_id는 서버가 검증한 identity.userId만 저장하며 클라이언트 userId·role·owner_id는 사용하지 않습니다. PUT은 제목과 본문만 바꾸고 소유자·ID는 바꾸지 않습니다.
+
+**4단계에 남긴 허점:** 목록은 로그인 사용자 소유 메모로 필터링하지만 상세 GET·PUT·DELETE는 소유자 검사를 하지 않습니다. 따라서 유효하게 로그인한 B가 A 메모의 UUID를 알면 접근·변경·삭제할 수 있는 구조입니다. 이번 단계에서는 그 검사를 구현하지 않았으며 실제 B의 타인 메모 접근 시험은 미실행, 4단계 기록 대상으로 남깁니다. 과거 노출 해소도 주장하지 않습니다.
+
+검증 명령: `node --test test/notes-api.test.mjs`. 로컬 빌드: `npm run build -- --local`. DB SQL 실행 후 GitHub 반영·Vercel 재배포가 필요합니다. A 로그인 → 메모 제목·본문 입력 → 추가 → 카드의 수정 → 수정 저장 → 삭제 순서로 검증합니다. 삭제한 ID의 인증된 GET은 404여야 합니다. 시크릿 창의 무로그인 GET·POST·PUT·DELETE는 모두 401이고 메모가 없어야 합니다. 실제 A 계정·배포·DB 실행 결과는 아직 미확인입니다.
