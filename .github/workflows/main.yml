@@ -1,0 +1,45 @@
+name: ALEPH Defense Bundle
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare bundle notes
+        run: |
+          cat > bundle-notes.json <<'EOF'
+          {
+            "explanation": "4단계 API 소유권 검사와 사용자 보고에 따른 RLS·최소 권한 적용 상태를 기록했습니다. 실제 비로그인 API 점검과 사용자 보고에 따른 소유권 검증 결과를 구분했습니다. 실제 A/B 계정 및 DB 권한의 독립 재검증은 수행하지 않았습니다.",
+            "blockedAt": "실제 A/B 계정 접근과 DB 소유자 RLS의 독립 재검증"
+          }
+          EOF
+
+      - name: Generate submission bundle
+        run: npm run bundle
+
+      - name: Print submission JSON
+        run: cat artifacts/submission.json
+
+      - name: Upload submission JSON
+        uses: actions/upload-artifact@v4
+        with:
+          name: aleph-step4-submission
+          path: artifacts/submission.json
+          if-no-files-found: error
