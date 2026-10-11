@@ -33,7 +33,7 @@ async function runFirstStageChecks(config) {
 
 export async function runAttackChecks(config) {
   if (config.step === 1) return runFirstStageChecks(config);
-  if (config.step !== 3) throw new Error('현재 자기 점검은 1·3단계에만 구현되어 있습니다.');
+  if (![3, 4].includes(config.step)) throw new Error('현재 자기 점검은 1·3·4단계에만 구현되어 있습니다.');
   const app = new URL(config.publicAppUrl);
   if (app.protocol !== 'https:' || app.username || app.password || app.search || app.hash || app.pathname !== '/') {
     throw new Error('실제 배포 주소를 확인해 주세요.');
@@ -48,7 +48,7 @@ export async function runAttackChecks(config) {
     ['invalid_token_note_list', 'GET', '/api/notes', true],
     ['public_static_notes_removed', 'GET', '/data.json'],
   ];
-  return Promise.all(cases.map(async ([attackId, method, path, invalidToken]) => {
+  const results = await Promise.all(cases.map(async ([attackId, method, path, invalidToken]) => {
     const expected = attackId === 'public_static_notes_removed'
       ? '현재 공개 data.json은 HTTP 404이며 메모를 반환하지 않음'
       : '인증 없는 요청 또는 잘못된 토큰은 HTTP 401이며 메모를 반환하지 않음';
@@ -72,4 +72,10 @@ export async function runAttackChecks(config) {
       return { attackId, expected, observed: '요청 실패 또는 시간 초과: HTTP 상태·자료 반환 여부 미확인' };
     }
   }));
+  if (config.step === 4) results.push(
+    { attackId: 'cross_owner_note_access', expected: '타인 메모 GET·PUT·DELETE는 자료 없이 404', observed: '미실행: 이 환경에서 실제 A/B 로그인 세션으로 재검증하지 않음; 사용자 B→A 404 보고와 구분' },
+    { attackId: 'owner_change_rejected', expected: 'POST·PUT 본문 owner_id 변경 시도는 400으로 거부', observed: '미실행: 실제 배포의 인증된 소유자 변경 요청은 재검증하지 않음' },
+    { attackId: 'database_rls_privileges', expected: '소유자 RLS 4개, anon 권한 없음, authenticated CRUD만 허용, service_role 유지', observed: '미실행: DB 관리자 연결 없이 독립 조회하지 않음; 사용자 적용·검증 보고와 구분' }
+  );
+  return results;
 }
