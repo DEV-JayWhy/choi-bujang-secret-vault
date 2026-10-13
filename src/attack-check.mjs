@@ -49,7 +49,7 @@ export async function runAttackChecks(config) {
     ['anonymous_note_delete', 'DELETE', `/api/notes/${missingId}`],
     ['invalid_token_note_list', 'GET', '/api/notes', true],
     ['public_static_notes_removed', 'GET', '/data.json'],
-    ...(config.step >= 10 ? [['restore_route_requires_login', 'GET', '/api/restore?id=00000000-0000-4000-8000-000000000123']] : []),
+    ...(config.step >= 10 ? [['restore_route_requires_login', 'GET', '/api/restore/00000000-0000-4000-8000-000000000123']] : []),
   ];
   const results = await Promise.all(cases.map(async ([attackId, method, path, invalidToken]) => {
     const expected = attackId === 'public_static_notes_removed'
