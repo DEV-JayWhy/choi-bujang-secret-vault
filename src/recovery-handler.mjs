@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { cookieToken, sameOrigin } from './server-auth.mjs';
 import { createLoginVerifier } from './verify-login.mjs';
 import { noteOwnerId } from './judge-ownership.mjs';
+import { checkAfterRestore } from './post-restore-retest.mjs';
 
 const config = JSON.parse(readFileSync(new URL('../aleph.config.json', import.meta.url), 'utf8'));
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
@@ -82,7 +83,7 @@ function validPreview(data, id, owner) {
 
 // The only real side effect is an atomic DB function acting on one verified
 // owner+UUID. Runtime functions never decide actual owners from client input.
-export function createRecoveryHandler(policy = false, { verify, makeClient } = {}) {
+export function createRecoveryHandler(policy = false, { verify, makeClient, retest } = {}) {
   return async (request, response) => {
     cleanResponse(response);
     if (!['GET','POST'].includes(request.method)) {
@@ -190,8 +191,20 @@ export function createRecoveryHandler(policy = false, { verify, makeClient } = {
           || data.retest?.foreignOwnerSameIdNotVisible !== true) {
         return response.status(503).json({ error: 'RESTORE_UNAVAILABLE' });
       }
-      // Local SQL post-restore checks are distinguishable from judge replay.
-      return response.status(200).json(data);
+      // These actual read-only rechecks start only after the verified DB commit.
+      // Failures are explicit and do not falsify or undo a completed restore.
+      let after;
+      try {
+        after = await (retest || checkAfterRestore)({
+          noteId: id, ownerId, authorization, db,
+        });
+      } catch {
+        after = { executedAfterRestore: false,
+          scope: 'server_get_and_local_synthetic_fixtures',
+          checks: [], allExecutedChecksPassed: false,
+          judgeFullReplay: 'not_run' };
+      }
+      return response.status(200).json({ ...data, postRestoreRetest: after });
     } catch {
       return response.status(503).json({ error: 'RESTORE_UNAVAILABLE' });
     }
