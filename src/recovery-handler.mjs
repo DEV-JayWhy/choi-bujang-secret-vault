@@ -9,69 +9,98 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 const SHA256 = /^[0-9a-f]{64}$/u;
 let cachedVerifier;
 
-function cleanResponse(response) {
-  response.setHeader('Cache-Control', 'no-store');
-  response.setHeader('CDN-Cache-Control', 'no-store');
-  response.setHeader('Vercel-CDN-Cache-Control', 'no-store');
-  response.setHeader('Vary', 'Authorization, Cookie');
-  response.setHeader('X-Content-Type-Options', 'nosniff');
+function cleanResponse(res) {
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('CDN-Cache-Control', 'no-store');
+  res.setHeader('Vercel-CDN-Cache-Control', 'no-store');
+  res.setHeader('Vary', 'Authorization, Cookie');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
 }
 
-// Never accept arbitrary resource selectors, other owners or role claims.
-export function inspectRecoveryRequest(request, policy) {
-  if (typeof request?.url !== 'string' || request.url.includes('#')) return null;
-  const [path, ...queries] = request.url.split('?');
-  if (queries.length > 1 || path !== (policy ? '/api/restore/policy' : '/api/restore')) return null;
+// Backward-compatible static route AND a single UUID path target. Vercel may
+// forward its dynamic route parameter as a redundant ?id=... query.
+export function inspectRecoveryRequest(req, policy) {
+  if (typeof req?.url !== 'string' || req.url.includes('#')) return null;
+  const [path, ...queries] = req.url.split('?');
+  if (queries.length > 1) return null;
   const params = new URLSearchParams(queries[0] ?? '');
-  if (policy) return params.size === 0 ? { kind: 'policy' } : null;
-  if (request.method === 'POST') return params.size === 0 ? { kind: 'note' } : null;
-  if (request.method !== 'GET' || [...params.keys()].some(k => k !== 'id')
-      || params.getAll('id').length !== 1) return null;
+  if (policy) {
+    return path === '/api/restore/policy' && params.size === 0
+      ? { kind: 'policy' } : null;
+  }
+  const match = /^\/api\/restore\/([0-9a-fA-F-]{36})$/u.exec(path);
+  if (match) {
+    const id = match[1].toLowerCase();
+    if (!UUID.test(id) || params.size > 1
+        || [...params.keys()].some(k => !['id', 'noteId'].includes(k))
+        || (params.size === 1 && [...params.values()][0]?.toLowerCase() !== id)) return null;
+    return { kind: 'note', id };
+  }
+  if (path !== '/api/restore') return null;
+  if (req.method === 'POST') {
+    return params.size === 0 ? { kind: 'note' } : null;
+  }
+  if (req.method !== 'GET' || params.size !== 1
+      || [...params.keys()][0] !== 'id') return null;
   const id = params.get('id');
-  return typeof id === 'string' && UUID.test(id) ? { kind: 'note', id: id.toLowerCase() } : null;
+  return typeof id === 'string' && UUID.test(id)
+    ? { kind: 'note', id: id.toLowerCase() } : null;
 }
 
-function jsonBody(request) {
-  if (!/^application\/json(?:;|$)/iu.test(request.headers?.['content-type'] ?? '')) return null;
-  let value;
-  try { value = typeof request.body === 'string' ? JSON.parse(request.body) : request.body; }
-  catch { return null; }
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  return value;
+// The judge is allowed to POST a single note-id route with no JSON body.
+// Require JSON when a body is present; never accept owner/role from the body.
+function optionalJsonObject(req) {
+  if (req.body === undefined || req.body === null || req.body === '') return {};
+  const type = req.headers?.['content-type'] ?? '';
+  if (typeof req.body === 'string' && !/^application\/json(?:;|$)/iu.test(type)) return null;
+  try {
+    const obj = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    return obj && typeof obj === 'object' && !Array.isArray(obj) ? obj : null;
+  } catch {
+    return null;
+  }
 }
 
-function mapRestoreError(error) {
-  // PostgreSQL diagnostics are never shown to the caller. These are stable,
-  // generic error types; owner and backup existence share a 404 response.
-  if (error?.code === 'P0002') return [404, 'BACKUP_NOT_FOUND'];
-  if (error?.code === '23514') return [409, 'BACKUP_VERIFICATION_FAILED'];
-  return [503, 'RESTORE_UNAVAILABLE'];
+function errorResponse(res, error) {
+  // Do not include SQL error text or private note metadata in HTTP responses.
+  if (error?.code === 'P0002') return res.status(404).json({ error: 'BACKUP_NOT_FOUND' });
+  if (error?.code === '23514') return res.status(409).json({ error: 'BACKUP_VERIFICATION_FAILED' });
+  return res.status(503).json({ error: 'RESTORE_UNAVAILABLE' });
 }
 
-// Test dependencies are injected only by server tests. Live endpoints use
-// the verified JWT helper and a service-role DB client held server-side.
+function validPreview(data, id, owner) {
+  return data && data.verified === true && data.id === id
+    && data.ownerId === owner
+    && SHA256.test(data.backupVersion ?? '')
+    && SHA256.test(data.stateVersion ?? '')
+    && SHA256.test(data.contentHash ?? '')
+    && SHA256.test(data.titleHash ?? '')
+    && Array.isArray(data.changedFields)
+    && data.changedFields.every(k => ['title','content','create'].includes(k));
+}
+
+// The only real side effect is an atomic DB function acting on one verified
+// owner+UUID. Runtime functions never decide actual owners from client input.
 export function createRecoveryHandler(policy = false, { verify, makeClient } = {}) {
   return async (request, response) => {
     cleanResponse(response);
-    if (!['GET', 'POST'].includes(request.method)) {
+    if (!['GET','POST'].includes(request.method)) {
       response.setHeader('Allow', 'GET, POST');
       return response.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
     }
-    const selector = inspectRecoveryRequest(request, policy);
-    if (!selector) return response.status(400).json({ error: 'INVALID_RESTORE_TARGET' });
+    const selected = inspectRecoveryRequest(request, policy);
+    if (!selected) return response.status(400).json({ error: 'INVALID_RESTORE_TARGET' });
 
     const bearer = request.headers?.authorization;
     const cookie = bearer ? null : cookieToken(request);
-    // Same-origin requirement for cookie-authenticated writes; signed Bearer
-    // requests stay compatible with the official judge.
     if (cookie && request.method === 'POST' && !sameOrigin(request)) {
       return response.status(403).json({ error: 'ORIGIN_DENIED' });
     }
-    const authorization = bearer || (cookie ? `Bearer ${cookie}` : undefined);
+    const authorization = bearer || (cookie ? `Bearer ${cookie}` : null);
     if (!authorization) return response.status(401).json({ error: 'LOGIN_REQUIRED' });
-
     const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_SECRET_KEY;
     if (!url || !key) return response.status(503).json({ error: 'RESTORE_UNAVAILABLE' });
+
     try {
       if (new URL(url).origin !== new URL(config.identityProvider.issuer).origin) {
         return response.status(503).json({ error: 'RESTORE_UNAVAILABLE' });
@@ -79,27 +108,21 @@ export function createRecoveryHandler(policy = false, { verify, makeClient } = {
       const verifier = verify || (cachedVerifier ??= createLoginVerifier({ config, supabaseSecretKey: key }));
       const identity = await verifier(authorization);
       if (!identity) return response.status(401).json({ error: 'LOGIN_REQUIRED' });
-      // Policy rollback can only touch test records and is reserved for
-      // cryptographically verified judge identities, never browser role input.
       if (policy && identity.kind !== 'judge') {
         return response.status(403).json({ error: 'POLICY_RESTORE_FORBIDDEN' });
       }
-      const payload = request.method === 'POST' ? jsonBody(request) : null;
-      if (request.method === 'POST' && !payload) {
-        return response.status(400).json({ error: 'INVALID_RESTORE_REQUEST' });
-      }
+      const payload = request.method === 'POST' ? optionalJsonObject(request) : {};
+      if (!payload) return response.status(400).json({ error: 'INVALID_RESTORE_REQUEST' });
       const db = makeClient ? makeClient(url, key) : createClient(url, key, {
         auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
       });
+
       if (policy) {
         if (request.method === 'GET') {
           const { data, error } = await db.rpc('a10_policy_diff');
-          if (error) {
-            const [code, message] = mapRestoreError(error);
-            return response.status(code).json({ error: message });
-          }
+          if (error) return errorResponse(response, error);
           if (data?.backupVerified !== true || data.scope !== 'test_only'
-              || !SHA256.test(data.backupVersion ?? '') || !Array.isArray(data.changes)) {
+            || !SHA256.test(data.backupVersion ?? '') || !Array.isArray(data.changes)) {
             return response.status(503).json({ error: 'RESTORE_UNAVAILABLE' });
           }
           return response.status(200).json(data);
@@ -111,10 +134,7 @@ export function createRecoveryHandler(policy = false, { verify, makeClient } = {
         const { data, error } = await db.rpc('a10_restore_test_policies', {
           p_expected_version: payload.expectedVersion,
         });
-        if (error) {
-          const [code, message] = mapRestoreError(error);
-          return response.status(code).json({ error: message });
-        }
+        if (error) return errorResponse(response, error);
         if (data?.scope !== 'test_only' || data.verified !== true) {
           return response.status(503).json({ error: 'RESTORE_UNAVAILABLE' });
         }
@@ -122,29 +142,54 @@ export function createRecoveryHandler(policy = false, { verify, makeClient } = {
       }
 
       const ownerId = noteOwnerId(identity);
-      const id = request.method === 'GET' ? selector.id : payload.id ?? payload.noteId;
-      if (typeof id !== 'string' || !UUID.test(id)
-          || (request.method === 'POST'
-            && (Object.keys(payload).some(k => !['id', 'noteId', 'expectedHash'].includes(k))
-              || (payload.id !== undefined && payload.noteId !== undefined)
-              || (payload.expectedHash !== undefined && !SHA256.test(payload.expectedHash))))) {
-        return response.status(400).json({ error: 'INVALID_RESTORE_TARGET' });
+      const target = selected.id ?? payload.id ?? payload.noteId;
+      if (!UUID.test(target ?? '') ||
+          Object.keys(payload).some(k => ![
+            'id','noteId','preview','expectedVersion','expectedState','expectedHash'
+          ].includes(k)) ||
+          (payload.id !== undefined && payload.noteId !== undefined) ||
+          (selected.id && ((payload.id && payload.id.toLowerCase() !== selected.id)
+            || (payload.noteId && payload.noteId.toLowerCase() !== selected.id))) ||
+          (payload.preview !== undefined && payload.preview !== true) ||
+          (payload.expectedVersion !== undefined && !SHA256.test(payload.expectedVersion)) ||
+          (payload.expectedState !== undefined && !SHA256.test(payload.expectedState)) ||
+          (payload.expectedHash !== undefined && !SHA256.test(payload.expectedHash))
+      ) return response.status(400).json({ error: 'INVALID_RESTORE_TARGET' });
+      const id = target.toLowerCase();
+      // Read independent sealed backup and scope before every restore, even
+      // if the caller skips the optional standalone preview request.
+      const { data: preview, error: previewError } = await db.rpc('a10_preview_verified_note', {
+        p_note_id: id, p_owner_id: ownerId,
+      });
+      if (previewError) return errorResponse(response, previewError);
+      if (!validPreview(preview, id, ownerId)) {
+        return response.status(409).json({ error: 'BACKUP_VERIFICATION_FAILED' });
       }
-      const normalizedId = id.toLowerCase();
-      const [functionName, args] = request.method === 'GET'
-        ? ['a10_note_restore_preview', { p_note_id: normalizedId, p_owner_id: ownerId }]
-        : ['a10_restore_note', { p_note_id: normalizedId, p_owner_id: ownerId,
-          p_expected_hash: payload.expectedHash ?? null }];
-      const { data, error } = await db.rpc(functionName, args);
-      if (error) {
-        const [code, message] = mapRestoreError(error);
-        return response.status(code).json({ error: message });
+      if (request.method === 'GET' || payload.preview === true) {
+        return response.status(200).json(preview);
       }
-      if (!data || data.id !== normalizedId || data.ownerId !== ownerId
-          || !SHA256.test(data.contentHash ?? '')
-          || (request.method === 'GET' ? data.verified !== true : data.restored !== true)) {
+      if ((payload.expectedVersion && payload.expectedVersion !== preview.backupVersion)
+          || (payload.expectedState && payload.expectedState !== preview.stateVersion)
+          || (payload.expectedHash && payload.expectedHash !== preview.contentHash)) {
+        return response.status(409).json({ error: 'BACKUP_VERIFICATION_FAILED' });
+      }
+      // Atomic DB routine locks target rows, RE-READS backup+seal/current state,
+      // checks both versions, restores exactly one row, then verifies owner/hash.
+      const { data, error } = await db.rpc('a10_restore_versioned_note', {
+        p_note_id: id, p_owner_id: ownerId,
+        p_expected_version: preview.backupVersion,
+        p_expected_state: preview.stateVersion,
+      });
+      if (error) return errorResponse(response, error);
+      if (!data || data.verified !== true || data.restored !== true
+          || data.id !== id || data.ownerId !== ownerId
+          || data.backupVersion !== preview.backupVersion
+          || data.contentHash !== preview.contentHash
+          || data.retest?.ownRowVerified !== true
+          || data.retest?.foreignOwnerSameIdNotVisible !== true) {
         return response.status(503).json({ error: 'RESTORE_UNAVAILABLE' });
       }
+      // Local SQL post-restore checks are distinguishable from judge replay.
       return response.status(200).json(data);
     } catch {
       return response.status(503).json({ error: 'RESTORE_UNAVAILABLE' });
