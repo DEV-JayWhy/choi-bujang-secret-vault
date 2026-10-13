@@ -28,7 +28,7 @@ jobs:
           console.log('JS_LINKS',JSON.stringify([...new Set([...html.matchAll(/(?:src|href)=["']([^"']+\.js[^"']*)["']/g)].map(x=>x[1]))].slice(0,70)));
 
           const patterns=[/S10_BACKUP_UNVERIFIED/g,/S10_RESTORE_MISMATCH/g,/S10_RETEST_MISSING/g,/backupVersion/g,/restoreRoute/g,/judgeIssuer/g,/\/api\/restore/g,/changedFields/g,/postRestoreRetest/g];
-          const visited=new Set(); const queue=paths.map(p=>new URL(p,origin+'/defense').href);
+          const visited=new Set(); const queue=[...paths.map(p=>new URL(p,origin+'/defense').href),origin+'/assets/defense-campaign-live.js'];
           while(queue.length && visited.size<65){
             const path=queue.shift();if(visited.has(path))continue;visited.add(path);
             try{
@@ -40,7 +40,7 @@ jobs:
               const words=['S10_BACKUP_UNVERIFIED','S10_RESTORE_MISMATCH','S10_RETEST_MISSING','restoreRoute','stage10','attackAttempts','backupVersion','judge'];
               const found=words.filter(x=>source.includes(x));
               if(found.length)console.log('MODULE_MATCH',JSON.stringify({path,found,imports}));
-              if(path.includes('defense-launch'))console.log('ENTRY_SOURCE',source.slice(0,9500));
+              if(path.includes('defense-campaign-live')){console.log('DEFENSE_MODULE_LENGTH',source.length);for(const term of ['submit','judge','stage10','restore','defense/judge','/api/','fetch(']){const index=source.toLowerCase().indexOf(term.toLowerCase());if(index>=0)console.log('DEFENSE_TERM',term,source.slice(Math.max(0,index-150),index+250).replace(/[\r\n]/g,' '));}}
               const hits=[];
               for(const re of patterns)if(re.test(source))hits.push(re.source);
               if(hits.length){
