@@ -1,0 +1,33 @@
+name: Stage 10 Production Recovery Smoke
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check public recovery authentication boundary and diagnostic headers
+        env:
+          PUBLIC_URL: https://choi-bujang-secret-vault-xi.vercel.app
+        run: |
+          node --input-type=module <<'NODE'
+          const url = process.env.PUBLIC_URL +
+            '/api/restore/11111111-1111-4111-8111-111111111111';
+          let reply;
+          for (let attempt=0; attempt<3; attempt++) {
+            reply = await fetch(url, { redirect:'manual', signal:AbortSignal.timeout(10000) });
+            if (reply.status===401) break;
+            await new Promise(resolve=>setTimeout(resolve,5000));
+          }
+          const checkpoint=reply.headers.get('x-aleph-recovery-checkpoint');
+          const trace=reply.headers.get('x-aleph-recovery-trace');
+          const body=await reply.json().catch(()=>null);
+          console.log(JSON.stringify({status:reply.status,checkpoint,
+            tracePresent:Boolean(trace),error:body?.error??null}));
+          if (reply.status!==401 || checkpoint!=='auth_missing'
+              || !trace || body?.error!=='LOGIN_REQUIRED') {
+            throw new Error('PRODUCTION_RECOVERY_DIAGNOSTIC_NOT_ACTIVE');
+          }
+          NODE
