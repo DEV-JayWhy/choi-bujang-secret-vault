@@ -21,8 +21,10 @@
     "GET /api/restore",
     "POST /api/restore",
     "GET /api/restore/policy",
-    "POST /api/restore/policy"
+    "POST /api/restore/policy",
+    "GET /api/restore/:id",
+    "POST /api/restore/:id"
   ],
   "originalApiUrl": "https://yugdsswjndlajydiwvwc.supabase.co/rest/v1/a02_private_notes",
-  "restoreRoute": "/api/restore"
+  "restoreRoute": "/api/restore/:id"
 }
