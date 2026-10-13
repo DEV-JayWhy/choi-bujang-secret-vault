@@ -10,12 +10,12 @@ const source = readFileSync(new URL('../src/decider.mjs', import.meta.url), 'utf
 const metadata = query => ({queryLength:query.length,
   querySha256:createHash('sha256').update(query).digest('hex')});
 
-test('ID query digests agree with independent Node SHA-256 vectors', async () => {
+test('all query-selected resources denied while exact UUID paths remain valid', async () => {
   const ids = ['demo', '00000000-0000-0000-0000-000000000000',
     'FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF', ...Array.from({length:32},()=>randomUUID())];
   for (const id of ids) {
     const request = {...fixtureRequests().normal,path:'/notes/'+id,...metadata('id='+id)};
-    assert.equal((await decide(request)).decision, id === 'demo' ? 'allow' : 'deny');
+    assert.equal((await decide(request)).decision, 'deny');
     assert.equal((await decide({...request,...metadata('')})).decision, 'allow');
     assert.equal((await decide({...request,...metadata('id='+id+'&action=export')})).decision,'deny');
     assert.equal((await decide({...request,querySha256:'0'.repeat(64)})).decision,'deny');
@@ -32,7 +32,7 @@ test('decision source executes without a module loader or Node/browser runtime A
   const {normal,suspicious} = fixtureRequests();
   for (const [request,expected] of [[normal,'allow'],[suspicious,'step_up'],
     [{...normal,deviceRegistered:false},'deny'],
-    [{...normal,...metadata('id=demo')},'allow'],
+    [{...normal,...metadata('id=demo')},'deny'],
     [{...normal,...metadata('action=export')},'deny']]) {
     const actual=await context.runDecision(request);
     assert.equal(actual.decision,expected);
