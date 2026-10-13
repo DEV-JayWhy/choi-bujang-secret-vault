@@ -19,6 +19,14 @@ jobs:
           if(response.status!==200)process.exit(1);
           const paths=[...new Set([...html.matchAll(/(?:src|href)="([^"]+\.js(?:\?[^"]*)?)"/g)].map(x=>x[1]))].slice(0,35);
           console.log('PUBLIC_JS_ASSETS',paths.length, JSON.stringify(paths));
+          for(const term of ['stage10','cortex','api/','submit','judge','assets/','script','S10_BACKUP_UNVERIFIED']){
+            const idx=html.toLowerCase().indexOf(term.toLowerCase());
+            console.log('HTML_REFERENCE',JSON.stringify({term,found:idx>=0,
+              excerpt:idx<0?'':html.slice(Math.max(0,idx-90),idx+190).replace(/[\r\n]/g,' ')}));
+          }
+          console.log('SCRIPT_TAGS',JSON.stringify([...html.matchAll(/<script[^>]*>/g)].map(x=>x[0]).slice(0,25)));
+          console.log('JS_LINKS',JSON.stringify([...new Set([...html.matchAll(/(?:src|href)=["']([^"']+\.js[^"']*)["']/g)].map(x=>x[1]))].slice(0,70)));
+
           const patterns=[/S10_BACKUP_UNVERIFIED/g,/S10_RESTORE_MISMATCH/g,/S10_RETEST_MISSING/g,/backupVersion/g,/restoreRoute/g,/judgeIssuer/g,/\/api\/restore/g,/changedFields/g,/postRestoreRetest/g];
           for(const path of paths){
             try{
