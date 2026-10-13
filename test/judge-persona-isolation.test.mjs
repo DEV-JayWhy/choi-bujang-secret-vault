@@ -47,3 +47,51 @@ test('real Supabase student owner identity remains unchanged', () => {
   const studentId = randomUUID();
   assert.equal(noteOwnerId({ kind: 'student', userId: studentId }), studentId);
 });
+
+test('signed judge audience accepts ONLY the configured alias or server-provided immutable production host', async () => {
+  const {privateKey, publicKey} = await generateKeyPair('ES256');
+  const runId = randomUUID(), subjectId = randomUUID();
+  const alias = new URL(config.publicAppUrl).hostname;
+  const immutable = 'choi-bujang-secret-vault-pinned-jyp13.vercel.app';
+  const verify = createLoginVerifier({
+    config,
+    deploymentHost: immutable,
+    supabaseClient:{auth:{getClaims:async()=>({error:new Error('student disallowed')})}},
+    judgeKeySet: async()=>publicKey,
+  });
+  const token = async (aud, persona='b') => new SignJWT({
+    aleph_run:runId, aleph_role:'judge', aleph_identity:persona,
+  }).setProtectedHeader({alg:'ES256'}).setIssuer(config.judgeIssuer)
+    .setAudience(aud).setSubject(subjectId).setIssuedAt()
+    .setExpirationTime('5m').sign(privateKey);
+  assert.equal((await verify('Bearer '+await token(alias)))?.kind,'judge');
+  assert.equal((await verify('Bearer '+await token(immutable)))?.identity,'b');
+  assert.equal(await verify('Bearer '+await token('attacker.vercel.app')),null);
+  assert.equal(await verify('Bearer '+await token('http://'+immutable)),null);
+  const rejectInvalid = createLoginVerifier({
+    config, deploymentHost:'attacker.example.com',
+    supabaseClient:{auth:{getClaims:async()=>({error:new Error('student disallowed')})}},
+    judgeKeySet:async()=>publicKey,
+  });
+  assert.equal(await rejectInvalid('Bearer '+await token('attacker.example.com')),null);
+  assert.equal((await rejectInvalid('Bearer '+await token(alias)))?.identity,'b');
+  assert.equal(await verify('Bearer '+await token(immutable, 'instructor')),null);
+  assert.equal(await verify('Bearer '+await token(immutable).then(x=>x.slice(0,-2)+'aa')),null);
+});
+
+test('signed run and subject IDs are bound as UUIDs, without inventing a v4-only requirement', async () => {
+  const {privateKey, publicKey} = await generateKeyPair('ES256');
+  const deploymentHost = 'choi-bujang-secret-vault-pinned-jyp13.vercel.app';
+  const verify = createLoginVerifier({
+    config, deploymentHost,
+    supabaseClient:{auth:{getClaims:async()=>({error:new Error('not student')})}},
+    judgeKeySet:async()=>publicKey,
+  });
+  const token = await new SignJWT({
+    aleph_run:'018fe5a1-c33f-7e55-a28b-48fba2c53b11',
+    aleph_role:'judge', aleph_identity:'b',
+  }).setProtectedHeader({alg:'ES256'}).setSubject('018fe5a1-c33f-7e55-a28b-48fba2c53b12')
+    .setIssuer(config.judgeIssuer).setAudience(deploymentHost)
+    .setIssuedAt().setExpirationTime('5m').sign(privateKey);
+  assert.equal((await verify('Bearer '+token))?.kind,'judge');
+});
