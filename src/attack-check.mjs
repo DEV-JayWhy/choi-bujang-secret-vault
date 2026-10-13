@@ -1,3 +1,5 @@
+import { detect } from './detect.mjs';
+
 // The student changes this check as each stage adds an attack to the same app.
 // Never return tokens, private keys, real names, or note bodies.
 async function runFirstStageChecks(config) {
@@ -33,7 +35,7 @@ async function runFirstStageChecks(config) {
 
 export async function runAttackChecks(config) {
   if (config.step === 1) return runFirstStageChecks(config);
-  if (![3, 4, 5, 6, 7, 8].includes(config.step)) throw new Error('현재 자기 점검은 1·3·4·5·6·7·8단계에만 구현되어 있습니다.');
+  if (![3, 4, 5, 6, 7, 8, 9].includes(config.step)) throw new Error('현재 자기 점검은 1·3·4·5·6·7·8·9단계에만 구현되어 있습니다.');
   const app = new URL(config.publicAppUrl);
   if (app.protocol !== 'https:' || app.username || app.password || app.search || app.hash || app.pathname !== '/') {
     throw new Error('실제 배포 주소를 확인해 주세요.');
@@ -52,8 +54,8 @@ export async function runAttackChecks(config) {
     const expected = attackId === 'public_static_notes_removed'
       ? '현재 공개 data.json은 HTTP 404이며 메모를 반환하지 않음'
       : '인증 없는 요청 또는 잘못된 토큰은 HTTP 401이며 메모를 반환하지 않음';
-    if (config.step === 8 && method !== 'GET') {
-      return { attackId, expected, observed: '미실행: 8단계 Production 점검은 읽기 전용; 실제 서비스 변경 위험이 있는 쓰기 요청은 전송하지 않음' };
+    if (config.step >= 8 && method !== 'GET') {
+      return { attackId, expected, observed: '미실행: 8·9단계 Production 점검은 읽기 전용; 실제 서비스 변경 위험이 있는 쓰기 요청은 전송하지 않음' };
     }
     try {
       const response = await fetch(new URL(path, app), {
@@ -75,14 +77,52 @@ export async function runAttackChecks(config) {
       return { attackId, expected, observed: '요청 실패 또는 시간 초과: HTTP 상태·자료 반환 여부 미확인' };
     }
   }));
-  if ([4, 5, 6, 7, 8].includes(config.step)) results.push(
+  if ([4, 5, 6, 7, 8, 9].includes(config.step)) results.push(
     { attackId: 'cross_owner_note_access', expected: '타인 메모 GET·PUT·DELETE는 자료 없이 404', observed: '미실행: 이 환경에서 실제 A/B 로그인 세션으로 재검증하지 않음; 사용자 B→A 404 보고와 구분' },
     { attackId: 'owner_change_rejected', expected: 'POST·PUT 본문 owner_id 변경 시도는 400으로 거부', observed: '미실행: 실제 배포의 인증된 소유자 변경 요청은 재검증하지 않음' },
     { attackId: 'database_rls_privileges', expected: config.step >= 5 ? '기존 소유자 RLS 유지, anon·authenticated 직접 권한 없음, service_role CRUD 유지' : '소유자 RLS 4개, anon 권한 없음, authenticated CRUD만 허용, service_role 유지', observed: '미실행: DB 관리자 연결 없이 독립 조회하지 않음; 사용자 적용·검증 보고와 구분' }
   );
-  if (config.step === 8) results.push(
-    { attackId: 'stage8_decider_path_policy', expected: '판정기에서 알 수 없는 서비스·메서드·경로 거부', observed: '미검증: zone_grant 경로 검사 로컬 구현; zone_denied의 현 운영 허용·엔진 매핑은 실제 심판 확인 대상' },
+  if (config.step >= 8) results.push(
+    { attackId: 'stage8_decider_path_policy', expected: '판정기에서 알 수 없는 서비스·메서드·경로 거부', observed: '미검증: 정확한 자원 경로에 대한 판정기 로컬 구현; 운영 엔진 구역 연결과 실제 소유권은 심판 확인 대상' },
     { attackId: 'instructor_notice_authorization', expected: '검증된 강사만 실제 강사 공지를 수정', observed: '미실행: 실제 공지 API·DB와 검증된 강사 권한 근거 없음; 공지 API를 신설하거나 권한을 부여하지 않음' }
   );
+  if (config.step === 9) {
+    // Read-only local fixture checks. Never send synthetic users or tokens to
+    // Production, and never describe a proposal as an actual session revocation.
+    const start = Date.UTC(2026, 9, 1, 0, 0, 0);
+    const reads = count => Array.from({ length: count }, (_, i) => ({
+      at: new Date(start + i * 2000).toISOString(),
+      method: 'GET', identity: { sub: 'synthetic_learner' },
+    }));
+    const normal = detect(reads(120));
+    const burst = detect(reads(121));
+    results.push(
+      {
+        attackId: 'stage9_normal_detection',
+        expected: '로컬 정상 120건에는 회수 제안 없음',
+        observed: `로컬 가상 점검: 120건 결과 ${normal.action}; 기대 조건 ${normal.action === 'observe' ? '일치' : '불일치'}`,
+      },
+      {
+        attackId: 'stage9_burst_detection',
+        expected: '동일 가명 주체 10분 내 GET 121건이면 burst_read 회수 제안',
+        observed: `로컬 가상 점검: 121건 결과 ${burst.action}; 이유 ${burst.reasonCode ?? '없음'}; 기대 조건 ${burst.action === 'propose_revocation' && burst.reasonCode === 'burst_read' && burst.subject === 'synthetic_learner' ? '일치' : '불일치'}`,
+      },
+      {
+        attackId: 'stage9_revoked_identity_retry',
+        expected: '회수된 신원의 다음 요청 거부 (실제 회수는 심판 담당)',
+        observed: '미실행: 로컬 detect는 제안만 생성하며 실제 신원 회수와 이후 API 재시도는 심판 담당',
+      },
+      {
+        attackId: 'stage9_stolen_session_retry',
+        expected: '회수 이후 기존 세션 재접속 거부 (실제 회수는 심판 담당)',
+        observed: '미실행: 심판의 세션 회수 집행과 탈취 세션 재시도 관측 불가',
+      },
+      {
+        attackId: 'stage9_cross_resource_retry',
+        expected: '회수된 주체의 다른 구역 이동 요청 거부 (실제 회수는 심판 담당)',
+        observed: '미실행: 심판의 회수 후 다른 자원 접근 재시험 관측 불가',
+      },
+    );
+  }
   return results;
 }
