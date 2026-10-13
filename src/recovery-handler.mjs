@@ -6,6 +6,7 @@ import { cookieToken, sameOrigin } from './server-auth.mjs';
 import { createLoginVerifier } from './verify-login.mjs';
 import { noteOwnerId } from './judge-ownership.mjs';
 import { checkAfterRestore } from './post-restore-retest.mjs';
+import { recordRecoveryIngress } from './recovery-ingress.mjs';
 import { recordRecoveryObservation } from './recovery-observation.mjs';
 
 const config = JSON.parse(readFileSync(new URL('../aleph.config.json', import.meta.url), 'utf8'));
@@ -86,7 +87,7 @@ function validPreview(data, id, owner) {
 
 // The only real side effect is an atomic DB function acting on one verified
 // owner+UUID. Runtime functions never decide actual owners from client input.
-export function createRecoveryHandler(policy = false, { verify, makeClient, retest, observe } = {}) {
+export function createRecoveryHandler(policy = false, { verify, makeClient, retest, observe, ingress } = {}) {
   return async (request, response) => {
     cleanResponse(response);
     // Emit only opaque request correlation and fixed stage/status codes. Never log
@@ -138,13 +139,23 @@ export function createRecoveryHandler(policy = false, { verify, makeClient, rete
         checkpoint('configuration_mismatch', 503);
         return response.status(503).json({ error: 'RESTORE_UNAVAILABLE' });
       }
+      const ingressClient = ingress ? null : createClient(url, key, {
+        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      });
+      const recordIngress = async stage => {
+        try { await (ingress ? ingress(stage) : recordRecoveryIngress(ingressClient, traceId, stage)); }
+        catch { /* A diagnostic failure cannot alter authentication or restoration. */ }
+      };
+      await recordIngress('auth_received');
       const verifier = verify || (cachedVerifier ??= createLoginVerifier({ config, supabaseSecretKey: key }));
       const identity = await verifier(authorization);
       if (!identity) {
+        await recordIngress('auth_rejected');
         checkpoint('auth_rejected', 401);
         return response.status(401).json({ error: 'LOGIN_REQUIRED' });
       }
       checkpoint('auth_verified');
+      await recordIngress('auth_verified');
       if (policy && identity.kind !== 'judge') {
         checkpoint('policy_forbidden', 403);
         return response.status(403).json({ error: 'POLICY_RESTORE_FORBIDDEN' });
@@ -154,9 +165,7 @@ export function createRecoveryHandler(policy = false, { verify, makeClient, rete
         checkpoint('payload_rejected', 400);
         return response.status(400).json({ error: 'INVALID_RESTORE_REQUEST' });
       }
-      const db = makeClient ? makeClient(url, key) : createClient(url, key, {
-        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-      });
+      const db = makeClient ? makeClient(url, key) : ingressClient;
 
       // Forensic checkpoints describe only signed callers, never subject/data IDs.
       // Telemetry is best-effort; an observability outage must not break recovery.

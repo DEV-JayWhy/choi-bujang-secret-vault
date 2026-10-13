@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createRecoveryHandler } from '../src/recovery-handler.mjs';
+import { createRecoveryHandler as productionHandler } from '../src/recovery-handler.mjs';
+const createRecoveryHandler = (policy, deps = {}) => productionHandler(policy, {
+  ingress: async () => false, ...deps,
+});
 import { noteOwnerId } from '../src/judge-ownership.mjs';
 
 const noteId = '33333333-3333-4333-8333-333333333333';

@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createRecoveryHandler, inspectRecoveryRequest } from '../src/recovery-handler.mjs';
+import { createRecoveryHandler as productionHandler, inspectRecoveryRequest } from '../src/recovery-handler.mjs';
+const createRecoveryHandler = (policy, deps = {}) => productionHandler(policy, {
+  ingress: async () => false, ...deps,
+});
 import { noteOwnerId } from '../src/judge-ownership.mjs';
 
 const ownId = '11111111-1111-4111-8111-111111111111';
@@ -217,15 +220,18 @@ test('signed judge A/B identities get different note backup scopes', () => {
 });
 
 test('fixed response checkpoints expose early gate failures without caller data',async()=>{
-  let calls=0;
+  let calls=0; const ingress=[];
   const handler=createRecoveryHandler(false,{verify:async()=>null,
+    ingress:async stage=>{ingress.push(stage);},
     makeClient:()=>{calls++;throw new Error('must not access database');}});
   let res=await run(handler,{method:'POST',url:'/api/restore/'+noteId,authorization:null});
   assert.equal(res.statusCode,401);
   assert.equal(res.headers['X-Aleph-Recovery-Checkpoint'],'auth_missing');
+  assert.deepEqual(ingress,[]);
   res=await run(handler,{method:'POST',url:'/api/restore/'+noteId});
   assert.equal(res.statusCode,401);
   assert.equal(res.headers['X-Aleph-Recovery-Checkpoint'],'auth_rejected');
+  assert.deepEqual(ingress,['auth_received','auth_rejected']);
   res=await run(handler,{url:'/api/restore/not-a-uuid'});
   assert.equal(res.statusCode,400);
   assert.equal(res.headers['X-Aleph-Recovery-Checkpoint'],'route_rejected');
