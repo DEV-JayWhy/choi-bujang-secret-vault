@@ -82,7 +82,9 @@ try {
   const targetLabel = checkTarget.origin === new URL(config.publicAppUrl).origin ? 'Production 설정 주소' : '별도 지정 검증 주소';
   const attackAttempts = await runAttackChecks({ ...config, publicAppUrl: checkTarget.origin });
   for (const attempt of attackAttempts) {
-    if (!attempt.observed.startsWith('미')) {
+    // A synthetic detector result is not an HTTP response. Label only real
+    // transport checks with the requested production host.
+    if (!attempt.observed.startsWith('미') && !attempt.observed.startsWith('로컬 가상')) {
       attempt.observed = `[HTTP 점검 대상 ${checkTarget.hostname}] ${attempt.observed}`;
     }
   }
