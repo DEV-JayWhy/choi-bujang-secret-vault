@@ -40,7 +40,7 @@ jobs:
               const words=['S10_BACKUP_UNVERIFIED','S10_RESTORE_MISMATCH','S10_RETEST_MISSING','restoreRoute','stage10','attackAttempts','backupVersion','judge'];
               const found=words.filter(x=>source.includes(x));
               if(found.length)console.log('MODULE_MATCH',JSON.stringify({path,found,imports}));
-              if(path.includes('defense-launch'))console.log('ENTRY_IMPORTS',JSON.stringify(imports));
+              if(path.includes('defense-launch'))console.log('ENTRY_SOURCE',source.slice(0,9500));
               const hits=[];
               for(const re of patterns)if(re.test(source))hits.push(re.source);
               if(hits.length){
