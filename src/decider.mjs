@@ -48,9 +48,7 @@ export function inspectNoteRoute(request) {
   if (request?.service !== 'notes') return false;
   const { method, route, path } = request;
   if (typeof path !== 'string' || typeof route !== 'string' || typeof method !== 'string') return false;
-  // The decision contract has no owner-scoped collection identifier. A bulk GET
-  // cannot prove that the returned collection belongs only to this subject.
-  if (path === '/notes') return method === 'POST' && route === 'POST /notes';
+  if (path === '/notes') return COLLECTION_METHODS.has(method) && route === `${method} /notes`;
   if (!ITEM_METHODS.has(method) || route !== `${method} /notes/:id`) return false;
   // One literal segment, no query, fragment, encoded separators, dot segments or reserved feature names.
   const match = /^\/notes\/([A-Za-z0-9_-]+)$/u.exec(path);
