@@ -1,4 +1,4 @@
-name: Stage 8 Security Regression
+name: Stage 6-9 Security Regression
 
 on:
   push:
@@ -7,6 +7,8 @@ on:
       - 'src/**'
       - 'api/**'
       - 'test/**'
+      - 'aleph.config.json'
+      - 'README.md'
       - '.github/workflows/stage8-verify.yml'
   workflow_dispatch:
 
@@ -32,8 +34,10 @@ jobs:
             test/stage8-routes.test.mjs \
             test/decider-runtime.test.mjs \
             test/stage6-7-regression.test.mjs
-      - name: Stage 9 input-only projection regression
-        run: node --test test/detect-input.test.mjs
+      - name: Stage 9 input privacy, burst thresholds and read-only self-check
+        run: |
+          npm run detect:test
+          node --test test/detect-input.test.mjs test/detect-window.test.mjs test/attack-check-readonly.test.mjs
       - name: Existing decision fixtures
         run: |
           npm run decider:test
