@@ -126,7 +126,10 @@ export async function checkAfterRestore({
     executedAfterRestore: true,
     scope: detail ? 'local_handler_and_synthetic_fixtures' : 'production_http_and_local_synthetic_fixtures',
     checks,
-    allExecutedChecksPassed: checks.every(x => x.passed === true),
+    // Explicitly unrun checks are not fictional failures or fictional successes.
+    // A completed check must still pass; transport failures remain false.
+    allExecutedChecksPassed: checks.some(x => x.passed !== null)
+      && checks.filter(x => x.passed !== null).every(x => x.passed === true),
     // The judge's full signed A/B attack replay and revocation timing are
     // deliberately NOT claimed as covered by these local checks.
     judgeFullReplay: 'not_run',
