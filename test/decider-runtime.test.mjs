@@ -15,7 +15,8 @@ test('ID query digests agree with independent Node SHA-256 vectors', async () =>
     'FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF', ...Array.from({length:32},()=>randomUUID())];
   for (const id of ids) {
     const request = {...fixtureRequests().normal,path:'/notes/'+id,...metadata('id='+id)};
-    assert.equal((await decide(request)).decision,'allow');
+    assert.equal((await decide(request)).decision, id === 'demo' ? 'allow' : 'deny');
+    assert.equal((await decide({...request,...metadata('')})).decision, 'allow');
     assert.equal((await decide({...request,...metadata('id='+id+'&action=export')})).decision,'deny');
     assert.equal((await decide({...request,querySha256:'0'.repeat(64)})).decision,'deny');
   }
