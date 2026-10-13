@@ -13,7 +13,7 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           const origin='https://aleph-omega.vercel.app';
-          const response=await fetch(origin+'/cortex',{redirect:'follow',signal:AbortSignal.timeout(12000)});
+          const response=await fetch(origin+'/defense',{redirect:'follow',signal:AbortSignal.timeout(12000)});
           const html=await response.text();
           console.log('PAGE',JSON.stringify({status:response.status,url:response.url,length:html.length}));
           if(response.status!==200)process.exit(1);
