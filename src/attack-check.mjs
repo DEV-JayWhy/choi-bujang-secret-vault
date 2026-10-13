@@ -81,7 +81,7 @@ export async function runAttackChecks(config) {
     { attackId: 'database_rls_privileges', expected: config.step >= 5 ? '기존 소유자 RLS 유지, anon·authenticated 직접 권한 없음, service_role CRUD 유지' : '소유자 RLS 4개, anon 권한 없음, authenticated CRUD만 허용, service_role 유지', observed: '미실행: DB 관리자 연결 없이 독립 조회하지 않음; 사용자 적용·검증 보고와 구분' }
   );
   if (config.step === 8) results.push(
-    { attackId: 'stage8_decider_path_policy', expected: '판정기에서 알 수 없는 서비스·메서드·경로 거부', observed: '미구현: 공식 경로 매핑과 경로 거부용 allowedReasonCodes 미확인; 기존 6·7단계 규칙 보존' },
+    { attackId: 'stage8_decider_path_policy', expected: '판정기에서 알 수 없는 서비스·메서드·경로 거부', observed: '미검증: zone_grant 경로 검사 로컬 구현; zone_denied의 현 운영 허용·엔진 매핑은 실제 심판 확인 대상' },
     { attackId: 'instructor_notice_authorization', expected: '검증된 강사만 실제 강사 공지를 수정', observed: '미실행: 실제 공지 API·DB와 검증된 강사 권한 근거 없음; 공지 API를 신설하거나 권한을 부여하지 않음' }
   );
   return results;

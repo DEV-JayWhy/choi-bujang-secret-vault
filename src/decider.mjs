@@ -1,7 +1,7 @@
 // ALEPH SDP 엔진이 확인한 요청만 받는 학생 판정기 시작점입니다.
 // 6단계: 엔진이 확인한 기기 등록 여부가 true일 때만 허용합니다.
 // 요청 본문의 userId, role, 기기 키, 토큰을 별도로 믿거나 저장하지 마세요.
-export const RULE_IDS = Object.freeze(['device_registered', 'step_up_required']);
+export const RULE_IDS = Object.freeze(['device_registered', 'step_up_required', 'zone_grant']);
 
 // 입력 형식 검사는 엔진 출처 인증을 대신하지 않습니다.
 // 헤더·위치값을 읽거나 요청을 보정하지 않으며 가상 신호를 실제 위치로 쓰지 않습니다.
@@ -38,6 +38,25 @@ export function inspectAccessContext(request) {
   };
 }
 
+// Local route policy based on the supplied engine GET fixture and existing CRUD methods.
+// This does not map /api paths or prove ownership/roles. The public r1 names zone_denied;
+// current runtime acceptance remains a judge verification item, not a local test guarantee.
+const COLLECTION_METHODS = new Set(['GET', 'POST']);
+const ITEM_METHODS = new Set(['GET', 'PUT', 'DELETE']);
+const RESERVED_ITEM_NAMES = new Set(['export']);
+export function inspectNoteRoute(request) {
+  if (request?.service !== 'notes') return false;
+  const { method, route, path } = request;
+  if (typeof path !== 'string' || typeof route !== 'string' || typeof method !== 'string') return false;
+  if (path === '/notes') return COLLECTION_METHODS.has(method) && route === `${method} /notes`;
+  if (!ITEM_METHODS.has(method) || route !== `${method} /notes/:id`) return false;
+  // One literal segment, no query, fragment, encoded separators, dot segments or reserved feature names.
+  const match = /^\/notes\/([A-Za-z0-9_-]+)$/u.exec(path);
+  if (!match) return false;
+  const id = match[1];
+  return id !== '.' && id !== '..' && !RESERVED_ITEM_NAMES.has(id.toLowerCase());
+}
+
 export async function decide(request) {
   const registered = request.deviceRegistered === true;
   const context = inspectAccessContext(request);
@@ -51,13 +70,16 @@ export async function decide(request) {
   // 동일 사용자·새 인증 시각의 검증 자체는 제공 엔진의 책임이며 여기서 재현하지 않습니다.
   const confirmed = context.stepUp?.verified === true;
   const needsConfirmation = context.source === 'unknown' || (unusualFixture && !confirmed);
-  const decision = !registered ? 'deny' : needsConfirmation ? 'step_up' : 'allow';
+  const routeAllowed = inspectNoteRoute(request);
+  const decision = !registered || !routeAllowed ? 'deny' : needsConfirmation ? 'step_up' : 'allow';
   return {
     schema: 'aleph.decision.v1',
     requestId: request.requestId,
     decision,
     reasonCode: !registered ? 'device_not_registered'
-      : needsConfirmation ? 'step_up_required' : 'approved',
-    ruleIds: needsConfirmation && registered ? [...RULE_IDS] : [RULE_IDS[0]],
+      : !routeAllowed ? 'zone_denied' : needsConfirmation ? 'step_up_required' : 'approved',
+    ruleIds: !registered ? ['device_registered']
+      : !routeAllowed ? ['zone_grant']
+        : needsConfirmation ? [...RULE_IDS] : ['device_registered', 'zone_grant'],
   };
 }

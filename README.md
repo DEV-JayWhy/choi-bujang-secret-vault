@@ -354,3 +354,16 @@ npm run fixture:7 (종료 코드 0)
 재검증: `node --test test/attack-check-readonly.test.mjs test/notes-ownership.test.mjs test/notes-cookie.test.mjs test/server-auth.test.mjs` 6건 통과, `npm run decider:test` 4건 통과, `git diff --check` 통과. 새 회귀 시험은 step 8에서 GET 4개만 전송하고 쓰기 3개는 미실행으로 표시함과 step 7의 기존 요청 7개 보존을 확인합니다.
 
 괴물별 상태: 갓김치사량(타인 개별 읽기), 충무공김밥(타인 수정), 성주참외롭다(타인 목록)는 기존 API 소유권 보호 구현과 로컬 HTTP/모의 DB 검증이 있지만 인증된 실제 배포 A/B 재검증은 없습니다. 경주화남빵은 실제 강사 공지 자원·검증된 강사 권한이 없어 구현·모의 검증·실제 검증 모두 미완료입니다. 판정기 자원별 규칙도 미구현입니다. 운영 데이터·권한은 변경하지 않았고 푸시·배포·심판 제출은 하지 않았습니다.
+
+
+### 8단계 재검증 후보 1 — 실제 심판 24점 이후 경로 정책
+
+기준 `c92443d49657`의 실제 심판은 24/100점이며 S08_UNKNOWN_PATH_ALLOWED와 S08_OTHER_ZONE_ALLOWED를 보고했습니다. 갓김치사량은 공격 성공, 수정·목록·공지 공격은 격파 표시였습니다. 이 결과는 공지 자원 구현 완료를 뜻하지 않습니다.
+
+첨부 ZIP의 inspectNoteRoute 경로 조합 검사와 19개 경로 시험·4개 회귀 시험을 재사용했습니다. 운영 코드 전체를 덮어쓰지 않고 기존 inspectAccessContext를 보존했습니다. service notes, 목록 GET/POST와 상세 GET/PUT/DELETE의 method·route·path를 함께 검사하며 상세 ID는 UUID로 한정하지 않습니다. demo와 안전한 단일 ASCII ID 구간을 허용하고 중첩·인코딩·역참조·쿼리/fragment 포함 경로는 거부합니다. export는 이번 로컬 정책에서 기능명으로 예약하며 공개 계약이 정한 완전한 예약어 목록이라고 주장하지 않습니다. ZIP의 다른 예약어들은 근거 없이 정상 ID를 막지 않도록 제외했습니다.
+
+zone_grant 규칙과 zone_denied 이유 코드는 공개 2026-09-26 r1 원고에 근거한 재검증 후보입니다. 운영 등록부 독립 확인이나 이전 심판의 승인된 거부 응답 근거는 없으며 실제 재제출로 결과를 확인합니다. 현재 요청에 identity.role·ownerId를 추가하지 않고 표시 자원 ID를 소유권 증거로 쓰지 않습니다. /notes와 /api/notes의 매핑도 일반적인 공식 엔진 계약으로 단정하지 않습니다. 이 정책은 경로를 제한하지만 같은 유효 경로의 타인 소유권은 최종 API에서 확인합니다.
+
+미등록 기기는 device_not_registered 우선 거부, 허용 경로의 복합 사건은 기존 step_up_required를 유지합니다. 추가 인증 완료도 잘못된 경로를 우회하지 못합니다. API·JWT·소유자 검사·쿼리 ID 방어·화면·설정 step 8은 변경하지 않았습니다. 별도 미커밋 실험 파일 두 개는 보존하며 운영 모듈과 연결하지 않습니다.
+
+로컬 검증: `node --test test/stage8-routes.test.mjs test/stage6-7-regression.test.mjs test/notes-ownership.test.mjs test/notes-cookie.test.mjs test/server-auth.test.mjs test/attack-check-readonly.test.mjs` 31건 통과, `npm run decider:test` 4건 통과, `npm run fixture:7` 정상 allow·복합 step_up, `git diff --check` 통과. 로컬 통과는 운영 이유 코드나 실제 심판 성공을 보증하지 않습니다. 정상 CRUD·타인 GET/PUT/DELETE 404·소유자 목록·URL 충돌은 모의 DB/로컬 HTTP 시험입니다. 실제 공지 자원·강사 권한은 여전히 없습니다.
