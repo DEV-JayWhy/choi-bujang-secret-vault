@@ -93,6 +93,7 @@ test('signed B may preview and restore one matching sealed backup via path or bo
       observations.push({ kind, checkpoint, reason }); return true;
     },
     retest: async input => {
+      assert.equal(input.contentHash,hash,'retest must compare HTTP content to the sealed backup');
       checksAfter.push({ noteId: input.noteId, ownerId: input.ownerId });
       return { executedAfterRestore: true, checks: [
         { name: 'restored_owner_get', passed: true },
@@ -110,6 +111,7 @@ test('signed B may preview and restore one matching sealed backup via path or bo
   result = await run(handler, { url:'/api/restore/'+noteId,method:'POST',body:undefined });
   assert.equal(result.statusCode,200,'judge may POST the UUID path with no body');
   assert.equal(result.body.restored,true);
+  assert.equal(result.headers['X-Aleph-Recovery-Checkpoint'],'retest_passed');
   assert.equal(state,'restored');
   assert.deepEqual(observations.slice(-4).map(x => x.checkpoint),
     ['auth_verified', 'backup_verified', 'restore_committed', 'retest_passed']);
@@ -208,4 +210,32 @@ test('signed judge A/B identities get different note backup scopes', () => {
   const a = { kind:'judge',userId:ownId,identity:'a',runId:noteId };
   const b = { kind:'judge',userId:ownId,identity:'b',runId:noteId };
   assert.notEqual(noteOwnerId(a),noteOwnerId(b));
+});
+
+test('fixed response checkpoints expose early gate failures without caller data',async()=>{
+  let calls=0;
+  const handler=createRecoveryHandler(false,{verify:async()=>null,
+    makeClient:()=>{calls++;throw new Error('must not access database');}});
+  let res=await run(handler,{method:'POST',url:'/api/restore/'+noteId,authorization:null});
+  assert.equal(res.statusCode,401);
+  assert.equal(res.headers['X-Aleph-Recovery-Checkpoint'],'auth_missing');
+  res=await run(handler,{method:'POST',url:'/api/restore/'+noteId});
+  assert.equal(res.statusCode,401);
+  assert.equal(res.headers['X-Aleph-Recovery-Checkpoint'],'auth_rejected');
+  res=await run(handler,{url:'/api/restore/not-a-uuid'});
+  assert.equal(res.statusCode,400);
+  assert.equal(res.headers['X-Aleph-Recovery-Checkpoint'],'route_rejected');
+  assert.equal(calls,0);
+});
+
+test('malformed body resource IDs cannot become server errors or reach backup RPC',async()=>{
+  let calls=0;
+  const handler=createRecoveryHandler(false,{verify:async()=>student,
+    makeClient:()=>({rpc:async()=>{calls++;throw new Error('unexpected backup lookup');}}),
+    observe:async()=>true});
+  for(const id of [{},[],42,null,true]) {
+    const res=await run(handler,{method:'POST',url:'/api/restore/'+noteId,body:{id}});
+    assert.equal(res.statusCode,400);
+  }
+  assert.equal(calls,0);
 });

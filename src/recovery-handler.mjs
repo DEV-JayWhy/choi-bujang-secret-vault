@@ -88,12 +88,18 @@ function validPreview(data, id, owner) {
 export function createRecoveryHandler(policy = false, { verify, makeClient, retest, observe } = {}) {
   return async (request, response) => {
     cleanResponse(response);
+    const checkpoint = name => response.setHeader('X-Aleph-Recovery-Checkpoint', name);
+    checkpoint('received');
     if (!['GET','POST'].includes(request.method)) {
       response.setHeader('Allow', 'GET, POST');
       return response.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
     }
     const selected = inspectRecoveryRequest(request, policy);
-    if (!selected) return response.status(400).json({ error: 'INVALID_RESTORE_TARGET' });
+    if (!selected) {
+      checkpoint('route_rejected');
+      return response.status(400).json({ error: 'INVALID_RESTORE_TARGET' });
+    }
+    checkpoint('route_validated');
 
     const bearer = request.headers?.authorization;
     const cookie = bearer ? null : cookieToken(request);
@@ -101,8 +107,12 @@ export function createRecoveryHandler(policy = false, { verify, makeClient, rete
       return response.status(403).json({ error: 'ORIGIN_DENIED' });
     }
     const authorization = bearer || (cookie ? `Bearer ${cookie}` : null);
-    if (!authorization) return response.status(401).json({ error: 'LOGIN_REQUIRED' });
+    if (!authorization) {
+      checkpoint('auth_missing');
+      return response.status(401).json({ error: 'LOGIN_REQUIRED' });
+    }
     const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_SECRET_KEY;
+    checkpoint('configuration_check');
     if (!url || !key) return response.status(503).json({ error: 'RESTORE_UNAVAILABLE' });
 
     try {
@@ -111,7 +121,11 @@ export function createRecoveryHandler(policy = false, { verify, makeClient, rete
       }
       const verifier = verify || (cachedVerifier ??= createLoginVerifier({ config, supabaseSecretKey: key }));
       const identity = await verifier(authorization);
-      if (!identity) return response.status(401).json({ error: 'LOGIN_REQUIRED' });
+      if (!identity) {
+        checkpoint('auth_rejected');
+        return response.status(401).json({ error: 'LOGIN_REQUIRED' });
+      }
+      checkpoint('auth_verified');
       if (policy && identity.kind !== 'judge') {
         return response.status(403).json({ error: 'POLICY_RESTORE_FORBIDDEN' });
       }
@@ -124,6 +138,7 @@ export function createRecoveryHandler(policy = false, { verify, makeClient, rete
       // Forensic checkpoints describe only signed callers, never subject/data IDs.
       // Telemetry is best-effort; an observability outage must not break recovery.
       const record = async (checkpoint, reason) => {
+        response.setHeader('X-Aleph-Recovery-Checkpoint', checkpoint);
         try {
           await (observe || recordRecoveryObservation)(db, identity.kind, checkpoint, reason);
         } catch { /* fail closed on private data, not telemetry availability */ }
@@ -155,7 +170,9 @@ export function createRecoveryHandler(policy = false, { verify, makeClient, rete
       await record('auth_verified', 'authenticated');
       const ownerId = noteOwnerId(identity);
       const target = selected.id ?? payload.id ?? payload.noteId;
-      if (!UUID.test(target ?? '') ||
+      if (typeof target !== 'string' || !UUID.test(target) ||
+          ['id','noteId'].some(k => payload[k] !== undefined &&
+            (typeof payload[k] !== 'string' || !UUID.test(payload[k]))) ||
           Object.keys(payload).some(k => ![
             'id','noteId','preview','expectedVersion','expectedState','expectedHash'
           ].includes(k)) ||
@@ -218,7 +235,7 @@ export function createRecoveryHandler(policy = false, { verify, makeClient, rete
       let after;
       try {
         after = await (retest || checkAfterRestore)({
-          noteId: id, ownerId, authorization, db,
+          noteId: id, ownerId, authorization, db, contentHash: preview.contentHash,
         });
       } catch {
         after = { executedAfterRestore: false,
