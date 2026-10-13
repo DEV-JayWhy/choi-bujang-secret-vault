@@ -458,3 +458,21 @@ zone_grant 규칙과 zone_denied 이유 코드는 공개 2026-09-26 r1 원고에
 **재검증 순서:** `npm run detect:test` → `npm run decider:test` → `npm run fixture:7` → `node --test test/recovery-api.test.mjs test/post-restore-retest.test.mjs test/notes-ownership.test.mjs test/attack-check-readonly.test.mjs` → `npm run build -- --local` → `npm run bundle`. `stage8-verify.yml`과 `stage9-bundle.yml`은 각각 회귀 테스트·번들을 실행합니다.
 
 **현재 제한:** 고쳐진 경로와 재시험 로직으로도 심판 통과를 보장할 수 없습니다. 다음 공식 재제출 전에는 새 커밋의 GitHub Actions, Vercel Production 최신 해시, 제출 JSON 최신 해시가 모두 일치하는지 확인해야 합니다.
+
+### 10단계 두 번째 공식 12점 이후 계약 수정 및 재검증 — 다음 심판 판정 대기
+
+**확인된 두 번째 판정:** 커밋 `2edaf1308fd5`도 공식 **12/100점**, `S10_BACKUP_UNVERIFIED`, `S10_RESTORE_MISMATCH`, `S10_RETEST_MISSING` 세 조건이 모두 실패했습니다. 자동 테스트·DB 합성 복구·배포 성공만으로는 심판 계정 B에 대한 복구 성공을 입증하지 못했습니다. 첫 재제출과 같은 점수였다는 사실을 그대로 보존합니다.
+
+**이번 수정의 실질적 차이:**
+
+- **허용 경로 제출 계약:** 기존 `allowedRoutes: ["GET /api/notes", ...]` 문자열 배열은 공식 샘플의 구역별 정책 형식과 불일치했습니다. `aleph.config.json`을 `schema:"aleph.config.v1"`과 각 `service`·`method`·`pathPattern`·`zone` 객체 배열로 바꿨습니다. 등록하지 않은 강사/관리자 쓰기 권한은 추가하지 않았습니다. 대상은 `notes / my-notes`의 `POST /api/restore/:id`로 한정합니다. `test/stage10-submission-contract.test.mjs`에서 잘못된 문자열 형식·범위 초과·중복 경로를 거부합니다. 이것이 공식 실패의 실제 원인이었는지는 **아직 미확정**입니다.
+- **복구 경로의 실제 배포 도달:** `src/attack-check.mjs`는 이제 가짜 UUID에 대해 실제 Production의 **`GET /api/restore/<UUID>`**를 전송합니다. 비인증 요청이 `HTTP 401`로 응답하는 것을 GitHub Actions의 `npm run bundle`에서 관측했습니다. 이는 **라우터와 로그인 게이트 존재**만 입증하며, 서명된 B 계정의 POST 및 실제 복원 성공을 증명하지는 않습니다.
+- **개인정보 없는 실패 단계 기록:** DB에 `sql/10_private_restore_observations.sql` 마이그레이션을 적용하고 `src/recovery-observation.mjs`을 추가했습니다. 로그인 검증 후에만 `judge`/`student` 구분과 고정 코드 `auth_verified`·`backup_verified`·`backup_rejected`·`restore_committed`·`restore_rejected`·`retest_passed`·`retest_failed`를 **추가 전용, 비공개 `a10_restore_observations`** 테이블에 기록합니다. UUID, 이메일, 토큰, IP, 메모 본문·제목·해시는 이 기록에 저장하지 않습니다. RLS를 활성화하고 익명/일반 사용자 직접 실행·읽기는 차단했습니다. 진단 기록 실패가 복구를 취소하지 않도록 했습니다. `test/recovery-observation.test.mjs`에서 입력 필터·개인정보 누락·기록 장애를 점검했습니다. 관측 기록은 **다음 실제 심판 호출이 성공적으로 로그인 게이트를 지난 경우에만 남을 수 있습니다**.
+- **기존 복구 경계 유지:** 사전 확인한 백업 원본을 독립 해시와 대조, 버전·차이 미리보기, 잠금 후 사본 재검증, 특정 UUID+검증된 소유자의 메모 한 건만 복원, ID·소유자·제목·본문 해시 비교와 감사 기록, 복구 **후** API 실제 GET 및 로컬 6~9단계 회귀 순서를 유지했습니다.
+- **제출 묶음 주의:** `scripts/bundle.mjs`의 `changedFiles`는 **HEAD 마지막 커밋의 파일들만** 나열합니다. 여러 커밋에 걸친 전체 10단계 변경 파일 목록이 아닙니다. 따라서 이전 `2edaf130` 묶음의 `changedFiles:["README.md"]`를 실질적인 10단계 수정 파일의 완전한 증거로 취급해서는 안 됩니다. 전체 구현은 실제 GitHub 파일/이력을 확인해야 합니다.
+
+**다음 검증 전 현재 범위:** 비공개 백업·봉인 각각 5건, 시험 정책/봉인 각각 4건, 운영 메모 5건, 복구 감사 기록 0건, 사본 봉인 불일치 0건으로 확인했습니다. 이 값은 공식 심판 B POST가 처리되었다는 증거가 **아닙니다**. 수정본으로 재제출할 경우 실제 심판 판정 후 `a10_restore_observations`의 **집계만** 읽어 로그인 통과·백업 거부·복구 완료 중 어디에서 멈췄는지 살피고, 그 결과에 따라 문제를 좁혀야 합니다. `a10_restore_observations`의 행이나 원본 비밀값을 공개 저장소·제출물에 넣지 않습니다.
+
+**테스트/배포:** `stage8-verify.yml`에서 기존 인증·소유권·판정기·복구 회귀에 계약/관측 기록 테스트를 포함합니다. `stage9-bundle.yml`은 실제 `npm run bundle`로 10단계 JSON을 만들고 유효성을 검증한 후 비공개 ZIP 아티팩트를 생성합니다. 최신 GitHub HEAD와 Production 배포 커밋이 같고 해당 HEAD의 두 workflow가 `SUCCESS`인 경우에만 다음 심판 제출 후보입니다.
+
+**미완료 증거:** 실제 시험 계정 B의 서명된 요청으로 메모를 변조/삭제한 뒤 복원·검증하는 테스트와 심판의 1~9단계 대표 공격 재전송은 본인이 가진 인증/운영 심판 권한으로만 확인할 수 있어 **미실행**입니다. 자동 CI 통과를 공식 점수로 표시하지 않습니다.
