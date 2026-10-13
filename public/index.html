@@ -48,6 +48,21 @@
       </form>
       <p id="note-message" role="status" aria-live="polite"></p>
     </section>
+    <section id="recovery-panel" hidden aria-label="메모 사본 복구" style="margin:24px 0;padding:20px;border:1px solid #51667c;border-radius:14px">
+      <h2>안전한 사본에서 메모 한 건 복원</h2>
+      <p>복원할 메모 UUID를 지정하고 원본 사본의 버전·변경 범위를 먼저 확인하세요. 삭제된 메모도 UUID를 알고 있으면 복원할 수 있습니다. 다른 자료는 변경하지 않습니다.</p>
+      <form id="restore-preview-form">
+        <label for="restore-id">복원할 메모 ID (UUID)</label>
+        <input id="restore-id" type="text" required pattern="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}" autocomplete="off" spellcheck="false" style="display:block;width:100%;max-width:100%;box-sizing:border-box;margin:8px 0;padding:10px">
+        <button id="restore-preview-button" type="submit">안전 사본 검증 및 변경 범위 보기</button>
+      </form>
+      <div id="restore-diff" hidden>
+        <p id="restore-preview-info" role="status" aria-live="polite"></p>
+        <label><input id="restore-confirm" type="checkbox"> 표시된 ID·소유자·버전·변경 항목을 확인했고 대상 한 건의 복원을 승인합니다.</label>
+        <button type="button" id="restore-execute" disabled>확인한 버전으로 한 건 복원</button>
+      </div>
+      <p id="restore-message" role="status" aria-live="polite"></p>
+    </section>
     <ul id="notes" aria-live="polite"><li>로그인하면 메모를 표시합니다.</li></ul>
   </main>
   <script type="module" src="/auth-ui.js"></script>
