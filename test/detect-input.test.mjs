@@ -39,12 +39,20 @@ test('invalid records cannot supply a synthetic owner, timestamp, or method', ()
   assert.throws(() => detect(null), { name: 'TypeError', message: 'invalid_detection_events' });
 });
 
-test('production detect result remains observe for normal or suspicious inputs at step 1', () => {
-  for (const input of [
-    [{ at, method: 'GET', identity: { sub: 'learner_fixture' } }],
-    Array.from({ length: 121 }, (_, i) => ({ at: new Date(Date.parse(at) + 2000*i).toISOString(),
-      method: 'GET', identity: { sub: 'learner_fixture' } })),
-  ]) {
-    assert.deepEqual(detect(input), { action: 'observe' });
-  }
+test('stage 9 proposal contains only the contract fields and no secrets', () => {
+  const events = Array.from({ length: 121 }, (_, i) => ({
+    at: new Date(Date.parse(at) + 2000 * i).toISOString(),
+    method: 'GET',
+    identity: { sub: 'learner_fixture', email: 'hidden@example.invalid' },
+    token: 'test-token-do-not-copy',
+    content: 'private-note-do-not-copy',
+    deviceId: 'unverified-device',
+    network: 'unusual',
+  }));
+  const snapshot = JSON.stringify(events);
+  assert.deepEqual(detect(events), {
+    action: 'propose_revocation', reasonCode: 'burst_read', subject: 'learner_fixture',
+  });
+  assert.equal(JSON.stringify(events), snapshot, 'original events are never mutated');
+  assert.deepEqual(detect(events.slice(0, 120)), { action: 'observe' });
 });
