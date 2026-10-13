@@ -62,9 +62,8 @@ export function notesHandler(detail) {
         return response.status(400).json({ error: 'INVALID_ID' });
       }
       const { id } = resource;
-      // 서버가 선택한 메모 이름 공간만 표시하며, 기존 소유권 검사는 그대로 수행합니다.
-      response.setHeader('X-Aleph-Resource-Id', detail
-        ? resourceId(RESOURCE_KINDS.note, id) : NOTES_COLLECTION_RESOURCE_ID);
+      // Resource identity is private until the authenticated DB ownership check passes.
+      // In particular, a 404/502 response must not carry an item resource header.
       let payload;
       if (['POST', 'PUT'].includes(request.method)) {
         try { payload = typeof request.body === 'string' ? JSON.parse(request.body) : request.body; }
@@ -91,6 +90,7 @@ export function notesHandler(detail) {
             || typeof row.id !== 'string' || !UUID.test(row.id))) {
           return response.status(502).json({ error: 'NOTES_UNAVAILABLE' });
         }
+        response.setHeader('X-Aleph-Resource-Id', NOTES_COLLECTION_RESOURCE_ID);
         return response.status(200).json(data.map(note));
       }
       if (request.method === 'POST') {
@@ -127,6 +127,7 @@ export function notesHandler(detail) {
       if (request.method === 'PUT' && data.owner_id !== identity.userId) {
         return response.status(502).json({ error: 'NOTES_UNAVAILABLE' });
       }
+      response.setHeader('X-Aleph-Resource-Id', resourceId(RESOURCE_KINDS.note, id));
       return response.status(200).json(request.method === 'DELETE' ? { id: data.id } : note(data));
     } catch {
       return response.status(502).json({ error: 'NOTES_UNAVAILABLE' });
