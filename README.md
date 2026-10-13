@@ -377,3 +377,17 @@ zone_grant 규칙과 zone_denied 이유 코드는 공개 2026-09-26 r1 원고에
 ### 8단계 제출 전 준비 — 판정기 모듈 의존성 제거
 
 6948aa262b80의 공식 0점(S08_OWN_BROKEN) 후 실행환경 차이를 분리하기 위해 판정기의 node:crypto import를 제거했습니다. 허용·거부 정책과 API는 유지하며 기존 ID 쿼리 SHA-256 비교를 순수 JavaScript로 대체합니다. test/decider-runtime.test.mjs에서 독립 해시 결과 및 모듈 로더/Node API 없는 VM 실행을 검증했습니다. 관련 테스트 44개, decider:test 4개, fixture:7, 로컬 빌드 통과. 공식 심판은 사용자가 직접 제출하며 이 버전의 점수는 아직 미확인입니다.
+
+## 9단계 저장점 — 도플갱어 조회 폭주 탐지 및 회수 제안 (2026-10-13)
+
+현재 제출 대상은 **9단계**이며 `aleph.config.json.step = 9`입니다. 기존 메모 로그인·소유권 API, 6단계 기기 규칙, 7단계 추가 확인, 8단계 자원 구역 판정 및 원본 `allowedRoutes`/서비스 발급자/원본 API 주소는 보존합니다.
+
+- **제작 1 — 입력:** `src/detect.mjs`의 `readDetectionEvents(events)`는 공식 `docs/DETECT_EVENTS.md`에서 제공한 `at`, `method`, `identity.sub`만 읽고 `{at, method, subject}`로 정리합니다. 사건에 있는 토큰·메모 내용·실명·임의 기기/네트워크/판정 필드는 복사하거나 로그에 남기지 않습니다. 잘못된 개별 사건은 제외하며 배열이 아닌 입력은 거부합니다.
+- **제작 2 — 탐지:** 동일 가명 사용자에게 속한 `GET` 사건을 시각순으로 정렬한 뒤 **10분 미만 이동 구간에서 120건 초과**일 때만 폭주로 판단합니다. 정확히 120건, 서로 다른 사용자들의 합계, 시간창 밖 사건, GET 아닌 동작은 감지하지 않습니다. 입력 순서와 무관하게 가장 먼저 임계값을 넘긴 사용자 하나를 선택합니다.
+- **제작 3 — 제안:** 폭주 사건의 **별도 `detect(events)` 결과에만** `{action:'propose_revocation',reasonCode:'burst_read',subject:'가명 사용자'}`를 반환합니다. 정상 사건은 `{action:'observe'}`입니다. `decide(request)`의 기존 다섯 필드·허용/거부 형식은 변경하지 않았고, 회수 API를 만들거나 DB·세션·기기 권한을 수정하지 않았습니다.
+- **9단계 원문과 공개 계약의 차이:** 단계 화면은 비정상 네트워크 및 특정 기기 한 개 회수까지 설명하지만, 제공 `docs/DETECT_EVENTS.md` 기본 사건은 **시각·메서드·가명 사용자만** 담습니다. 따라서 이 코드만으로 비정상 네트워크를 확인하거나 기기 하나를 신뢰성 있게 식별할 수 없습니다. 실제 도플갱어 기기 회수·탈취 세션 무효화·다른 자료 이동 거부·경과시간 계산은 운영 심판의 집행 범위이며 미검증입니다. 이 제한을 브라우저/요청 본문의 임의 필드로 메우지 않았습니다.
+- **보안 경계:** `src/attack-check.mjs`의 9단계 자체 HTTP 점검은 공개 배포에 GET만 전송합니다. 정상 120건/폭주 121건 탐지는 **로컬 가상 사건 결과**로 별도 기록하고, 실제 회수 후 재시도 3종은 `미실행`으로 명시합니다. 로컬 성공을 실제 기기·세션 회수로 주장하지 않습니다.
+- **검증:** `npm run detect:test`, `node --test test/detect-input.test.mjs test/detect-window.test.mjs test/attack-check-readonly.test.mjs`, `npm run decider:test`, `npm run fixture:7`, `npm run build -- --local`. 자동 회귀 실행은 `.github/workflows/stage8-verify.yml`에서 6~9단계를 함께 점검합니다.
+- **저장점/번들:** 9단계 코드를 `main`에 반영하고 배포가 최신 HEAD의 `READY`인지 확인한 뒤 `npm run bundle`을 실행합니다. 로컬 제출 묶음 파일 `bundle-notes.json` 및 `artifacts/submission.json`은 Git에 올리지 않으며, 공식 심판 재제출은 학생이 수행합니다.
+
+**이전 단계의 미해결 심판 문제를 구분합니다.** 8단계 공식 최근 확인 점수는 `96fc04b...`에서 **48/100, S08_OTHER_ZONE_ALLOWED**였습니다. 이후 판정기 조정 `92ed2a2...`의 공식 심판 결과는 이 저장소에 확인된 기록이 없습니다. 9단계 제출이 8단계 문제 해결을 소급 증명하지 않습니다.
