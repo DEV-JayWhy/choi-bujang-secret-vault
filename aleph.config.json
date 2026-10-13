@@ -10,21 +10,92 @@
     "audience": "authenticated"
   },
   "allowedRoutes": [
-    "GET /api/notes",
-    "POST /api/notes",
-    "GET /api/notes/:id",
-    "PUT /api/notes/:id",
-    "DELETE /api/notes/:id",
-    "POST /api/auth/login",
-    "GET /api/auth/session",
-    "POST /api/auth/logout",
-    "GET /api/restore",
-    "POST /api/restore",
-    "GET /api/restore/policy",
-    "POST /api/restore/policy",
-    "GET /api/restore/:id",
-    "POST /api/restore/:id"
+    {
+      "service": "notes",
+      "method": "GET",
+      "pathPattern": "/api/notes",
+      "zone": "my-notes"
+    },
+    {
+      "service": "notes",
+      "method": "POST",
+      "pathPattern": "/api/notes",
+      "zone": "my-notes"
+    },
+    {
+      "service": "notes",
+      "method": "GET",
+      "pathPattern": "/api/notes/:id",
+      "zone": "my-notes"
+    },
+    {
+      "service": "notes",
+      "method": "PUT",
+      "pathPattern": "/api/notes/:id",
+      "zone": "my-notes"
+    },
+    {
+      "service": "notes",
+      "method": "DELETE",
+      "pathPattern": "/api/notes/:id",
+      "zone": "my-notes"
+    },
+    {
+      "service": "auth",
+      "method": "POST",
+      "pathPattern": "/api/auth/login",
+      "zone": "authentication"
+    },
+    {
+      "service": "auth",
+      "method": "GET",
+      "pathPattern": "/api/auth/session",
+      "zone": "authentication"
+    },
+    {
+      "service": "auth",
+      "method": "POST",
+      "pathPattern": "/api/auth/logout",
+      "zone": "authentication"
+    },
+    {
+      "service": "notes",
+      "method": "GET",
+      "pathPattern": "/api/restore",
+      "zone": "my-notes"
+    },
+    {
+      "service": "notes",
+      "method": "POST",
+      "pathPattern": "/api/restore",
+      "zone": "my-notes"
+    },
+    {
+      "service": "auth",
+      "method": "GET",
+      "pathPattern": "/api/restore/policy",
+      "zone": "authentication"
+    },
+    {
+      "service": "auth",
+      "method": "POST",
+      "pathPattern": "/api/restore/policy",
+      "zone": "authentication"
+    },
+    {
+      "service": "notes",
+      "method": "GET",
+      "pathPattern": "/api/restore/:id",
+      "zone": "my-notes"
+    },
+    {
+      "service": "notes",
+      "method": "POST",
+      "pathPattern": "/api/restore/:id",
+      "zone": "my-notes"
+    }
   ],
   "originalApiUrl": "https://yugdsswjndlajydiwvwc.supabase.co/rest/v1/a02_private_notes",
-  "restoreRoute": "/api/restore/:id"
+  "restoreRoute": "/api/restore/:id",
+  "schema": "aleph.config.v1"
 }
