@@ -43,7 +43,7 @@ export function inspectAccessContext(request) {
 // current runtime acceptance remains a judge verification item, not a local test guarantee.
 const COLLECTION_METHODS = new Set(['GET', 'POST']);
 const ITEM_METHODS = new Set(['GET', 'PUT', 'DELETE']);
-const RESERVED_ITEM_NAMES = new Set(['export']);
+const RESERVED_ITEM_NAMES = new Set(['export', 'all', 'bulk', 'search', 'admin']);
 export function inspectNoteRoute(request) {
   if (request?.service !== 'notes') return false;
   const { method, route, path } = request;
@@ -70,7 +70,14 @@ export async function decide(request) {
   // 동일 사용자·새 인증 시각의 검증 자체는 제공 엔진의 책임이며 여기서 재현하지 않습니다.
   const confirmed = context.stepUp?.verified === true;
   const needsConfirmation = context.source === 'unknown' || (unusualFixture && !confirmed);
-  const routeAllowed = inspectNoteRoute(request);
+  // Engine contract does not expose a verified role. Instructor notices and
+  // materials are read-only for this student policy; never infer instructor rights.
+  // Preserve the fixture's /notes/demo and ordinary per-user notes CRUD.
+  const protectedWrite = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)
+    && (request.service === 'announcements' || request.service === 'instructor'
+      || request.service === 'materials'
+      || /^\\/(?:announcements|instructor|materials)(?:\\/|$)/u.test(request.path ?? ''));
+  const routeAllowed = !protectedWrite && inspectNoteRoute(request);
   const decision = !registered || !routeAllowed ? 'deny' : needsConfirmation ? 'step_up' : 'allow';
   return {
     schema: 'aleph.decision.v1',
