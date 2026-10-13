@@ -193,7 +193,7 @@ Preview에서 직접 확인할 항목: A/B 로그인 후 각자 메모 조회·�
 
 기존 로그인·CRUD 모의 회귀 및 실행기 테스트 9개 통과, `npm run build -- --local` 성공. 기존 xdr-01 파일·결과(10/9/9), 원본 경보, ZTNA·앱·배포 설정을 변경하지 않았습니다. 기존 `test:package` API 목록 불일치 실패는 미해결이며 이번 작업에서 재실행하지 않았습니다. 실제 로그인·운영 배포·DB·심판 검증은 이번 작업 범위에서 미실행입니다. GitHub 푸시·배포·심판 제출은 하지 않습니다.
 
-## 6단계 제작 2·3: 기기 등록 조건 (미커밋)
+## 6단계 제작 2·3: 기기 등록 조건 (당시 기록)
 
 기준 커밋: `27c03a9a532da89a155baa8e8a5ffa8d4293e960`. 2026-10-13 로컬에서 `docs/DECIDER_REQUEST.md`의 요청·응답 계약을 확인한 뒤 `src/decider.mjs`에 `device_registered`를 구현했습니다. `request.deviceRegistered === true`일 때만 `allow / approved`, 그 외에는 `deny / device_not_registered`를 반환합니다. 응답 다섯 항목과 요청 ID를 보존합니다.
 
@@ -233,3 +233,17 @@ JS
 추가 시험 결과: true는 `allow / approved`, false·누락·문자열 true·숫자 1·null은 모두 `deny / device_not_registered`였습니다. npm의 기존 환경 설정 `http-proxy`에 관한 경고가 출력됐지만 시험은 정상 종료했습니다.
 
 이 검증은 로컬 가상 요청 연습입니다. 실제 등록 기기의 브라우저 접속, 인증서 없는 mTLS 요청 거부, 다른 사용자 토큰과 기기의 조합 거부는 이번 작업에서 확인하지 않았으며 운영 엔진·심판의 검증 대상입니다. 브라우저가 직접 보낸 등록 상태를 신뢰하는 기능을 추가하지 않았습니다. 재실행 명령은 `npm run decider:test`이며 실제 화면 확인은 기존 자료실에서 로그인 후 메모 목록을 여는 순서입니다. 인증서·CA·개인키·서명 키는 생성하지 않았습니다. 기존 `test:package` 불일치는 이번 범위에서 재실행하거나 수정하지 않았습니다. 설정 step은 5로 보존했으며 커밋·bundle 생성·푸시·배포·심판 제출은 수행하지 않았습니다.
+
+## 6단계 저장점 후속: 제출 단계 정합성 수정
+
+기존 `6단계 저장점`은 `ec415dd14c87b73721bb6391f18092d15d182828`이며 이 커밋은 보존합니다. 해당 저장점 후 `bundle-notes.json` 누락을 해결하고 bundle을 생성했지만, 설정이 5여서 제출 JSON에도 숫자 5가 기록되었습니다. 위 제작 2·3의 미커밋·미생성 설명은 해당 작업 당시 기록입니다.
+
+원인: `scripts/bundle.mjs`는 `git show HEAD:aleph.config.json`으로 커밋된 설정을 읽고 `step: config.step`을 출력합니다. `src/attack-check.mjs`는 기존 1·3·4·5단계만 지원했습니다. 설정만 6으로 바꾸면 자기 점검에서 실패하므로 설정과 지원 범위를 함께 수정해야 합니다.
+
+최소 변경: `aleph.config.json`의 step만 5에서 6으로 변경하고, 자기 점검의 지원 목록·소유권/DB 미실행 결과 목록에 6을 추가했습니다. 6단계 DB 기대 조건은 기존 5단계와 동일합니다. 기기 등록 규칙·기존 HTTP 요청 7개·미실행 항목 3개·발급자·judgeIssuer·배포 주소·허용 경로·원본 API 주소는 보존합니다. 기존 API 인증·권한·화면·XDR 기능과 테스트 파일은 변경하지 않았습니다.
+
+실제 로컬 검증: `npm run decider:test`의 정상 등록 기기 허용·미등록 기기 거부 2건 통과. 기준 저장점의 자기 점검 함수와 수정본에 동일한 모의 HTTP 응답을 공급해 1·3·4·5단계 결과 및 요청 경로·메서드·헤더·본문이 동일함을 확인했습니다. 2단계의 기존 미지원 상태도 유지하며, 6단계 점검 10개는 기존 5단계 결과와 동일합니다. 이는 모의 HTTP 회귀 검증이며 실제 심판 판정이 아닙니다. `git diff --check`도 통과했습니다.
+
+재실행 순서: `npm run decider:test` → `git diff --check` → 후속 저장점 커밋 → 로컬 전용 `bundle-notes.json`에 단계 수정 및 미검증 범위를 기록 → `npm run bundle` → `artifacts/submission.json`의 step이 숫자 6, commit이 후속 HEAD, policyRules가 `["device_registered"]`, attackAttempts가 10개인지 확인합니다. changedFiles는 마지막 후속 커밋만 나타내므로 이전 저장점의 `src/decider.mjs`가 이 목록에 없어도 규칙은 현재 HEAD에 보존됩니다. bundle-notes.json과 제출 JSON은 커밋하지 않습니다.
+
+남은 범위: 실제 등록 기기 화면·mTLS·사용자/기기 조합에 대한 운영 엔진·심판 검증, 인증된 A/B 소유권·소유자 변경·DB 권한 재검증은 미실행입니다. 기존 `test:package` 불일치는 이번 범위에서 수정하거나 재실행하지 않았습니다. `.github/workflows/main.yml`은 여전히 5단계 전용이며 이번 로컬 bundle 수정에는 포함하지 않습니다. 추후 Actions로 생성할 때는 단계 단언·설명·산출물 이름을 별도로 맞춰야 합니다. GitHub 푸시·배포·실제 제출은 수행하지 않습니다. 인증서·CA·개인키·서명 키를 생성하지 않습니다.
