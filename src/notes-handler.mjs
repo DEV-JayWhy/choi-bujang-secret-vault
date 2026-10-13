@@ -28,6 +28,10 @@ export function inspectNoteUrl(request, detail) {
 export function notesHandler(detail) {
   return async (request, response) => {
     response.setHeader('Cache-Control', 'no-store');
+    // Private note responses must never be reused across identities by a CDN.
+    response.setHeader('CDN-Cache-Control', 'no-store');
+    response.setHeader('Vercel-CDN-Cache-Control', 'no-store');
+    response.setHeader('Vary', 'Authorization, Cookie');
     response.setHeader('X-Content-Type-Options', 'nosniff');
     const methods = detail ? ['GET', 'PUT', 'DELETE'] : ['GET', 'POST'];
     if (!methods.includes(request.method)) {
