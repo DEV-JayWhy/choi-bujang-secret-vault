@@ -65,3 +65,15 @@ jobs:
           console.log('DEPLOYMENT_IDENTITY_NOT_YET_CURRENT',JSON.stringify(latest));
           process.exit(1);
           NODE
+
+      - name: Check official judge JWKS reachability for real ES256 verification
+        run: |
+          node --input-type=module <<'NODE'
+          const endpoint='https://aleph-judge-production.up.railway.app/defense/judge/.well-known/jwks.json';
+          const response=await fetch(endpoint,{redirect:'error',signal:AbortSignal.timeout(12000)});
+          const json=await response.json().catch(()=>null);
+          const keys=Array.isArray(json?.keys)?json.keys:[];
+          const es256=keys.some(key=>key.kty==='EC'&&key.crv==='P-256'&&key.x&&key.y);
+          console.log(JSON.stringify({jwksStatus:response.status,keyCount:keys.length,hasES256:es256}));
+          if(response.status!==200||!es256) throw new Error('JUDGE_JWKS_UNAVAILABLE');
+          NODE
