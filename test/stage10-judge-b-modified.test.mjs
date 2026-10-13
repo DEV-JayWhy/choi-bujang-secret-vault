@@ -56,3 +56,52 @@ test('verified judge B modified note: preview reread, atomic one-ID restore and 
   assert.deepEqual(calls,['a10_preview_verified_note','a10_preview_verified_note','a10_restore_versioned_note']);
   assert.equal(retestCalls,1);
 });
+
+test('signed ES256 judge B auth reaches sealed restore without owner substitution',async()=>{
+  const {generateKeyPair,SignJWT}=await import('jose');
+  const {createLoginVerifier}=await import('../src/verify-login.mjs');
+  const {readFileSync}=await import('node:fs');
+  const cfg=JSON.parse(readFileSync(new URL('../aleph.config.json',import.meta.url),'utf8'));
+  const {privateKey,publicKey}=await generateKeyPair('ES256');
+  const token=await new SignJWT({aleph_role:'judge',aleph_identity:'b',
+    aleph_run:judgeB.runId})
+    .setProtectedHeader({alg:'ES256'}).setSubject(judgeB.userId)
+    .setIssuer(cfg.judgeIssuer).setAudience(new URL(cfg.publicAppUrl).hostname)
+    .setIssuedAt().setExpirationTime('5m').sign(privateKey);
+  const verifier=createLoginVerifier({config:cfg,judgeKeySet:async()=>publicKey,
+    supabaseClient:{auth:{getClaims:async()=>({error:new Error('not-student')})}}});
+  const verified=await verifier('Bearer '+token);
+  assert.equal(verified.kind,'judge');
+  assert.equal(noteOwnerId(verified),expectedOwner);
+  const names=[];const client={rpc:async(name,params)=>{
+    names.push(name);
+    assert.equal(params.p_owner_id,expectedOwner);
+    assert.equal(params.p_note_id,noteId);
+    if(name==='a10_preview_verified_note')
+      return {data:{id:noteId,ownerId:expectedOwner,verified:true,
+        contentHash:hash,titleHash:hash,backupVersion,stateVersion,
+        changedFields:['content']}};
+    assert.equal(name,'a10_restore_versioned_note');
+    return {data:{verified:true,restored:true,id:noteId,ownerId:expectedOwner,
+      contentHash:hash,backupVersion,retest:{
+        ownRowVerified:true,foreignOwnerSameIdNotVisible:true}}};
+  }};
+  const handler=createRecoveryHandler(false,{verify:verifier,
+    makeClient:()=>client,observe:async()=>true,
+    retest:async()=>({executedAfterRestore:true,allExecutedChecksPassed:true,
+      checks:[{name:'owner_get',passed:true}],judgeFullReplay:'not_run'})});
+  const responseObject=response();
+  const previousUrl=process.env.SUPABASE_URL,previousKey=process.env.SUPABASE_SECRET_KEY;
+  process.env.SUPABASE_URL='https://yugdsswjndlajydiwvwc.supabase.co';
+  process.env.SUPABASE_SECRET_KEY='offline-mock-server-key';
+  try {
+    await handler({method:'POST',url:'/api/restore/'+noteId,
+      headers:{authorization:'Bearer '+token}},responseObject);
+  }finally{
+    if(previousUrl===undefined)delete process.env.SUPABASE_URL;else process.env.SUPABASE_URL=previousUrl;
+    if(previousKey===undefined)delete process.env.SUPABASE_SECRET_KEY;else process.env.SUPABASE_SECRET_KEY=previousKey;
+  }
+  assert.equal(responseObject.code,200);
+  assert.equal(responseObject.body.restored,true);
+  assert.deepEqual(names,['a10_preview_verified_note','a10_restore_versioned_note']);
+});
