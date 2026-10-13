@@ -41,11 +41,11 @@ export function inspectRecoveryRequest(req, policy) {
     return { kind: 'note', id };
   }
   if (path !== '/api/restore') return null;
-  if (req.method === 'POST') {
-    return params.size === 0 ? { kind: 'note' } : null;
-  }
-  if (req.method !== 'GET' || params.size !== 1
-      || [...params.keys()][0] !== 'id') return null;
+  if (!['GET', 'POST'].includes(req.method)) return null;
+  if (req.method === 'POST' && params.size === 0) return { kind: 'note' };
+  // Accept the same exact one-ID selector for read-only preview and POST.
+  // This never permits owner, role, duplicate keys, or an unscoped restore.
+  if (params.size !== 1 || [...params.keys()][0] !== 'id') return null;
   const id = params.get('id');
   return typeof id === 'string' && UUID.test(id)
     ? { kind: 'note', id: id.toLowerCase() } : null;
