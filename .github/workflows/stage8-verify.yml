@@ -32,6 +32,8 @@ jobs:
             test/stage8-routes.test.mjs \
             test/decider-runtime.test.mjs \
             test/stage6-7-regression.test.mjs
+      - name: Stage 9 input-only projection regression
+        run: node --test test/detect-input.test.mjs
       - name: Existing decision fixtures
         run: |
           npm run decider:test
