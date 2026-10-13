@@ -15,15 +15,15 @@ async function expectDecision(request, expected) {
   assert.deepEqual(Object.keys(result).sort(), ['decision', 'reasonCode', 'requestId', 'ruleIds', 'schema']);
 }
 
-test('preserve legitimate note item GET and own collection GET', async () => {
+test('preserve individual note GET/PUT; unscoped engine collections are denied', async () => {
   await expectDecision(withRoute('GET', '/notes/demo', 'GET /notes/:id'), 'allow');
-  await expectDecision(withRoute('GET', '/notes', 'GET /notes'), 'allow');
-  await expectDecision(withRoute('POST', '/notes', 'POST /notes'), 'allow');
+  await expectDecision(withRoute('GET', '/notes', 'GET /notes'), 'deny');
+  await expectDecision(withRoute('POST', '/notes', 'POST /notes'), 'deny');
   await expectDecision(withRoute('PUT', '/notes/demo', 'PUT /notes/:id'), 'allow');
 });
 
-test('reject query-filtered collection reads while preserving unfiltered own list', async () => {
-  await expectDecision({ ...withRoute('GET', '/notes', 'GET /notes'), queryLength: 0 }, 'allow');
+test('deny unscoped collections regardless of query metadata', async () => {
+  await expectDecision({ ...withRoute('GET', '/notes', 'GET /notes'), queryLength: 0 }, 'deny');
   await expectDecision({ ...withRoute('GET', '/notes', 'GET /notes'), queryLength: 19 }, 'deny');
 });
 
@@ -35,7 +35,7 @@ test('missing or contradictory query metadata cannot authorize an item or collec
       { querySha256: '' }, { querySha256: '0'.repeat(64) },
       { queryLength: 1 }, { queryLength: null },
     ]) await expectDecision({ ...normal, ...patch }, 'deny');
-    await expectDecision(normal, 'allow');
+    await expectDecision(normal, path === '/notes' ? 'deny' : 'allow');
   }
 });
 
@@ -55,12 +55,13 @@ test('safe-looking words cannot select other zones or collection functions', asy
   }
 });
 
-test('production UUID CRUD and documented demo remain available', async () => {
+test('production UUID single-resource GET/PUT and documented demo remain available', async () => {
   for (const id of ['demo', '11111111-1111-4111-8111-111111111111',
     'ABCDEF12-3456-4789-ABCD-0123456789AB']) {
-    for (const method of ['GET', 'PUT', 'DELETE']) {
+    for (const method of ['GET', 'PUT']) {
       await expectDecision(withRoute(method, '/notes/' + id, method + ' /notes/:id'), 'allow');
     }
+    await expectDecision(withRoute('DELETE', '/notes/' + id, 'DELETE /notes/:id'), 'deny');
   }
 });
 
@@ -73,7 +74,7 @@ test('item queries cannot change resource scope or bypass a verified step-up', a
   await expectDecision({ ...request, queryLength: 0 }, 'allow');
 });
 
-test('only the path-selected ID query is permitted, never functions or another owner scope', async () => {
+test('path-only scope denies all query-selected item resources and functions', async () => {
   const id = '11111111-1111-4111-8111-111111111111';
   const req = withRoute('GET', '/notes/' + id, 'GET /notes/:id');
   await expectDecision({ ...req, ...queryMetadata('id=' + id) }, 'deny');
