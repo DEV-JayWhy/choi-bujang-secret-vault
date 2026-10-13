@@ -1,5 +1,6 @@
 // Stage 10 final checkpoint: authenticated exact-ID preview, sealed restore, post-restore checks.
 import { createClient } from '@supabase/supabase-js';
+import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { cookieToken, sameOrigin } from './server-auth.mjs';
 import { createLoginVerifier } from './verify-login.mjs';
@@ -88,15 +89,28 @@ function validPreview(data, id, owner) {
 export function createRecoveryHandler(policy = false, { verify, makeClient, retest, observe } = {}) {
   return async (request, response) => {
     cleanResponse(response);
-    const checkpoint = name => response.setHeader('X-Aleph-Recovery-Checkpoint', name);
+    // Emit only opaque request correlation and fixed stage/status codes. Never log
+    // tokens, request bodies, note IDs, ownership, or raw database errors.
+    const traceId = randomUUID();
+    response.setHeader('X-Aleph-Recovery-Trace', traceId);
+    const diagnostic = (stage, status) => {
+      console.info('ALEPH_RECOVERY_DIAG', JSON.stringify({
+        traceId, stage, ...(status === undefined ? {} : { status }),
+      }));
+    };
+    const checkpoint = (name, status) => {
+      response.setHeader('X-Aleph-Recovery-Checkpoint', name);
+      diagnostic(name, status);
+    };
     checkpoint('received');
     if (!['GET','POST'].includes(request.method)) {
+      checkpoint('method_rejected', 405);
       response.setHeader('Allow', 'GET, POST');
       return response.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
     }
     const selected = inspectRecoveryRequest(request, policy);
     if (!selected) {
-      checkpoint('route_rejected');
+      checkpoint('route_rejected', 400);
       return response.status(400).json({ error: 'INVALID_RESTORE_TARGET' });
     }
     checkpoint('route_validated');
@@ -104,33 +118,42 @@ export function createRecoveryHandler(policy = false, { verify, makeClient, rete
     const bearer = request.headers?.authorization;
     const cookie = bearer ? null : cookieToken(request);
     if (cookie && request.method === 'POST' && !sameOrigin(request)) {
+      checkpoint('origin_rejected', 403);
       return response.status(403).json({ error: 'ORIGIN_DENIED' });
     }
     const authorization = bearer || (cookie ? `Bearer ${cookie}` : null);
     if (!authorization) {
-      checkpoint('auth_missing');
+      checkpoint('auth_missing', 401);
       return response.status(401).json({ error: 'LOGIN_REQUIRED' });
     }
     const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_SECRET_KEY;
     checkpoint('configuration_check');
-    if (!url || !key) return response.status(503).json({ error: 'RESTORE_UNAVAILABLE' });
+    if (!url || !key) {
+      checkpoint('configuration_missing', 503);
+      return response.status(503).json({ error: 'RESTORE_UNAVAILABLE' });
+    }
 
     try {
       if (new URL(url).origin !== new URL(config.identityProvider.issuer).origin) {
+        checkpoint('configuration_mismatch', 503);
         return response.status(503).json({ error: 'RESTORE_UNAVAILABLE' });
       }
       const verifier = verify || (cachedVerifier ??= createLoginVerifier({ config, supabaseSecretKey: key }));
       const identity = await verifier(authorization);
       if (!identity) {
-        checkpoint('auth_rejected');
+        checkpoint('auth_rejected', 401);
         return response.status(401).json({ error: 'LOGIN_REQUIRED' });
       }
       checkpoint('auth_verified');
       if (policy && identity.kind !== 'judge') {
+        checkpoint('policy_forbidden', 403);
         return response.status(403).json({ error: 'POLICY_RESTORE_FORBIDDEN' });
       }
       const payload = request.method === 'POST' ? optionalJsonObject(request) : {};
-      if (!payload) return response.status(400).json({ error: 'INVALID_RESTORE_REQUEST' });
+      if (!payload) {
+        checkpoint('payload_rejected', 400);
+        return response.status(400).json({ error: 'INVALID_RESTORE_REQUEST' });
+      }
       const db = makeClient ? makeClient(url, key) : createClient(url, key, {
         auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
       });
@@ -138,6 +161,7 @@ export function createRecoveryHandler(policy = false, { verify, makeClient, rete
       // Forensic checkpoints describe only signed callers, never subject/data IDs.
       // Telemetry is best-effort; an observability outage must not break recovery.
       const record = async (checkpoint, reason) => {
+        diagnostic(checkpoint);
         response.setHeader('X-Aleph-Recovery-Checkpoint', checkpoint);
         try {
           await (observe || recordRecoveryObservation)(db, identity.kind, checkpoint, reason);
@@ -183,7 +207,10 @@ export function createRecoveryHandler(policy = false, { verify, makeClient, rete
           (payload.expectedVersion !== undefined && !SHA256.test(payload.expectedVersion)) ||
           (payload.expectedState !== undefined && !SHA256.test(payload.expectedState)) ||
           (payload.expectedHash !== undefined && !SHA256.test(payload.expectedHash))
-      ) return response.status(400).json({ error: 'INVALID_RESTORE_TARGET' });
+      ) {
+        checkpoint('target_rejected', 400);
+        return response.status(400).json({ error: 'INVALID_RESTORE_TARGET' });
+      }
       const id = target.toLowerCase();
       // Read independent sealed backup and scope before every restore, even
       // if the caller skips the optional standalone preview request.
@@ -247,6 +274,7 @@ export function createRecoveryHandler(policy = false, { verify, makeClient, rete
         after.allExecutedChecksPassed === true ? 'checks_passed' : 'checks_failed');
       return response.status(200).json({ ...data, postRestoreRetest: after });
     } catch {
+      checkpoint('unexpected_error', 503);
       return response.status(503).json({ error: 'RESTORE_UNAVAILABLE' });
     }
   };
