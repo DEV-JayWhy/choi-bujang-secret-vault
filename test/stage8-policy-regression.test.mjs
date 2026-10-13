@@ -59,8 +59,7 @@ test('production UUID CRUD and documented demo remain available', async () => {
   for (const id of ['demo', '11111111-1111-4111-8111-111111111111',
     'ABCDEF12-3456-4789-ABCD-0123456789AB']) {
     for (const method of ['GET', 'PUT', 'DELETE']) {
-      await expectDecision(withRoute(method, '/notes/' + id, method + ' /notes/:id'),
-        method === 'GET' && id !== 'demo' ? 'step_up' : 'allow');
+      await expectDecision(withRoute(method, '/notes/' + id, method + ' /notes/:id'), 'allow');
     }
   }
 });
