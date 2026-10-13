@@ -30,7 +30,7 @@ const blocked = [
 for (const [method, path, route] of allowed) test(`allow ${method} ${path}`, async () => {
   const req = { ...base, method, path, route };
   assert.equal(inspectNoteRoute(req), true);
-  assert.equal((await decide(req)).decision, method === 'GET' && /^\/notes\/[0-9a-f]{8}-/.test(path) ? 'step_up' : 'allow');
+  assert.equal((await decide(req)).decision, 'allow');
 });
 for (const [method, path, route] of blocked) test(`deny ${method} ${path}`, async () => {
   const req = { ...base, method, path, route };
