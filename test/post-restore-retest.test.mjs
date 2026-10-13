@@ -45,7 +45,19 @@ test('after-restore checks actually invoke authorized GET, foreign denial and re
 
 test('when foreign fixture is absent, missing attack is explicitly not_run',async()=>{
   const detail=async(req,res)=>res.status(req.headers.authorization?200:401).json({id:self});
-  const db={from(){return {select(){return {neq(){return {limit:async()=>({data:[],error:null})};}}};}}};
+  const db = {
+    from() {
+      return {
+        select() {
+          return {
+            neq() {
+              return { limit: async () => ({ data: [], error: null }) };
+            },
+          };
+        },
+      };
+    },
+  };
   const result=await checkAfterRestore({noteId:self,ownerId:self,authorization:token,db,detail});
   const foreignTest=result.checks.find(x=>x.name==='other_owner_get_denied');
   assert.equal(foreignTest.passed,null);
