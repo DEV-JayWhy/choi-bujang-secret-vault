@@ -76,7 +76,7 @@ export async function decide(request) {
   const protectedWrite = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)
     && (request.service === 'announcements' || request.service === 'instructor'
       || request.service === 'materials'
-      || /^\\/(?:announcements|instructor|materials)(?:\\/|$)/u.test(request.path ?? ''));
+      || /^\/(?:announcements|instructor|materials)(?:\/|$)/u.test(request.path ?? ''));
   const routeAllowed = !protectedWrite && inspectNoteRoute(request);
   const decision = !registered || !routeAllowed ? 'deny' : needsConfirmation ? 'step_up' : 'allow';
   return {
