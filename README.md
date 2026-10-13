@@ -522,3 +522,10 @@ zone_grant 규칙과 zone_denied 이유 코드는 공개 2026-09-26 r1 원고에
 **DB 확인과 남은 시험:** 읽기 전용 실 DB 조회에서 메모/백업/봉인 각 5건, 사본 무결성·현재 본문 불일치 0건, 감사·관측 각 0건입니다. 기존 자료를 보존하는 롤백형 합성 B 변조·삭제·복원 시험을 요청했으나 Supabase 연결이 두 차례 `Invalid or expired requestState`로 실행 결과를 주지 않았습니다. 해당 SQL 시험은 성공으로 기록하지 않습니다. 현재 심판의 정확한 B 대상과 서명된 B 세션에 접근하지 못했으므로 그 대상의 공격 직전 백업 및 Production의 인증된 복원/정상 요청 전체 흐름은 미실행입니다. 기존 SQL·데이터·백업·감사를 수정하는 마이그레이션은 추가하지 않았습니다.
 
 **재현/검수 순서:** `npm install` → `node --test test/*.test.mjs` → `npm run decider:test` → `npm run detect:test` → `npm run fixture:7` → `npm run build -- --local`. main 반영 및 Production READY 이후 공개 별칭 `/aleph.json`의 SHA·공개 URL, 익명/위조 토큰 복원 GET을 확인하고 ignored `bundle-notes.json`에 실제 결과·미실행을 기록한 뒤 `npm run bundle`을 실행합니다. 생성 JSON은 HEAD SHA와 일치해야 합니다. 심판 재제출은 아직 하지 않으며 B 실측/남은 미실행 항목은 최종 검수에서 별도로 판단합니다.
+
+
+### 10단계 생성→복원 기준 연결 검증 (2026-10-13 UTC)
+
+새 메모 POST는 기존 불변 백업에 같은 UUID가 있으면 `409 ID_CONFLICT`로 중단합니다. 삭제한 메모의 ID를 다른 내용으로 재사용해 과거 사본과 현재 생성 결과가 달라지는 경로를 막습니다. 새 INSERT 후에는 `a10_preview_verified_note`로 사본과 seal을 다시 읽고 ID·검증된 소유자·본문 SHA-256·제목 SHA-256·변경 항목 없음까지 확인해야 201을 반환합니다. 백업 부재·검증 실패는 503이며, 이미 생성된 행이나 기존 사본을 삭제하거나 덮어쓰지 않습니다. 실패 응답 이후 행이 남을 수 있으므로 새 생성 성공으로 해석하지 말고 관리자 검토가 필요합니다.
+
+검증 순서: `npm install`, `node --test test/*.test.mjs`, `npm run decider:test`, `npm run detect:test`, Production 배포 SHA 확인, `npm run bundle`, 실제 심판 제출 및 판정 수집. 로컬 HTTP/mock DB 회귀는 UUID 재사용·백업 부재·seal 실패·소유자 불일치·본문 해시 불일치와 A/B 접근 차단을 검사합니다. 실제 Supabase 읽기 조회에서 기존 5개 백업은 preview의 ID·소유자·본문 해시가 일치했습니다. 이 5개가 실제 심판 B의 변조 대상이라는 증거는 없으며, 로컬 회귀 성공을 심판 점수 개선으로 기록하지 않습니다. 실제 심판 B의 인증·변조·복원·전체 재시험은 아직 미실행입니다.

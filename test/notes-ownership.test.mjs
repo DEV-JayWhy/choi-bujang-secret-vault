@@ -7,6 +7,7 @@ import collection from '../api/notes.js';
 import detail from '../api/notes/[id].js';
 import { inspectNoteUrl } from '../src/notes-handler.mjs';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 const config = JSON.parse(readFileSync(new URL('../aleph.config.json', import.meta.url)));
 const response = () => ({ headers: {}, setHeader(k,v) { this.headers[k]=v; }, status(code) { this.code = code; return this; },
   json(body) { this.body = body; return this; } });
@@ -14,7 +15,7 @@ test('A/B own CRUD, cross-owner denial, owner spoof denial and unauthenticated d
   const previousFetch = globalThis.fetch;
   const previousUrl = process.env.SUPABASE_URL, previousKey = process.env.SUPABASE_SECRET_KEY;
   const userId = '11111111-1111-4111-8111-111111111111';
-  const rows = new Map(); let writes = 0; let forceForeignGetRow = false;
+  const rows = new Map(), backups = new Map(); let backupFault = null; let writes = 0; let forceForeignGetRow = false;
   let forceWrongGetId = false; let forceForeignListRow = false;
   const { privateKey, publicKey } = await generateKeyPair('ES256');
   const jwk = await exportJWK(publicKey); Object.assign(jwk, { kid: 'local-test', alg: 'ES256', use: 'sig' });
@@ -64,6 +65,19 @@ test('A/B own CRUD, cross-owner denial, owner spoof denial and unauthenticated d
       const url = new URL(String(input));
       const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
       if (url.pathname.endsWith('jwks.json')) return json({ keys: [jwk] });
+      if (url.pathname === '/rest/v1/a10_note_backups') {
+        const target = url.searchParams.get('note_id')?.slice(3);
+        return json(backups.has(target) ? [{note_id:target}] : []);
+      }
+      if (url.pathname === '/rest/v1/rpc/a10_preview_verified_note') {
+        const {p_note_id:id,p_owner_id:owner}=JSON.parse(init.body);
+        const row=backups.get(id);
+        if (!row || backupFault === 'missing') return json({code:'P0002'},404);
+        const hash=value=>createHash('sha256').update(value).digest('hex');
+        return json({verified:backupFault !== 'seal',id,ownerId:backupFault === 'owner' ? bId : row.owner_id,
+          contentHash:hash(backupFault === 'content' ? 'damaged' : row.content),
+          titleHash:hash(row.title),changedFields:[]});
+      }
       assert.equal(url.pathname, '/rest/v1/a02_private_notes');
       const id = url.searchParams.get('id')?.slice(3);
       const ownerFilter = url.searchParams.get('owner_id')?.slice(3);
@@ -71,7 +85,7 @@ test('A/B own CRUD, cross-owner denial, owner spoof denial and unauthenticated d
       if (init.method === 'POST') {
         writes++; const row = JSON.parse(init.body); assert.ok([userId, bId].includes(row.owner_id));
         if (rows.has(row.id)) return json({ code: '23505' }, 409);
-        rows.set(row.id, row); return new Response(null, { status: 201 });
+        rows.set(row.id, row); backups.set(row.id,{...row}); return new Response(null, { status: 201 });
       }
       if (init.method === 'PATCH') {
         writes++; const changes = JSON.parse(init.body); assert.deepEqual(Object.keys(changes).sort(), ['content', 'title']);
@@ -166,6 +180,19 @@ test('A/B own CRUD, cross-owner denial, owner spoof denial and unauthenticated d
     const suppliedId = '22222222-2222-4222-8222-222222222222';
     assert.deepEqual((await call(collection, 'POST', { id: suppliedId, title: 'test', body: '' })).body, { id: suppliedId });
     assert.equal((await call(collection, 'POST', { id: suppliedId, title: 'test', body: '' })).code, 409);
+    // Deletion must not erase/rebase an immutable backup on UUID reuse.
+    await call(detail,'DELETE',undefined,suppliedId);
+    const saved=structuredClone(backups.get(suppliedId)), before=writes;
+    assert.equal((await call(collection,'POST',{id:suppliedId.toUpperCase(),title:'new',body:'different'})).code,409);
+    assert.equal(writes,before); assert.deepEqual(backups.get(suppliedId),saved);
+    assert.equal(rows.has(suppliedId),false);
+    // An insert with missing/mismatched seal is not reported as recoverable.
+    for (backupFault of ['missing','seal','owner','content']) {
+      const result=await call(collection,'POST',{title:'fixture',body:'fixture'});
+      assert.equal(result.code,503); assert.equal(result.body.error,'BACKUP_VERIFICATION_FAILED');
+      assert.equal(result.headers['x-aleph-resource-id'],undefined);
+    }
+    backupFault=null;
   } finally {
     await new Promise(resolve => server.close(resolve));
     globalThis.fetch = previousFetch;

@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { readFileSync } from 'node:fs';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { cookieToken, sameOrigin } from './server-auth.mjs';
 import { createLoginVerifier } from './verify-login.mjs';
 import { RESOURCE_KINDS, NOTES_COLLECTION_RESOURCE_ID, resourceId } from './resource-ids.mjs';
@@ -96,12 +96,32 @@ export function notesHandler(detail) {
         return response.status(200).json(data.map(note));
       }
       if (request.method === 'POST') {
-        const newId = payload.id ?? randomUUID();
+        const newId = (payload.id ?? randomUUID()).toLowerCase();
+        // A deleted UUID still has an immutable recovery baseline. Never reuse
+        // it for new contents or disclose whether another owner has that backup.
+        const existing = await db.from('a10_note_backups').select('note_id')
+          .eq('note_id', newId).maybeSingle();
+        if (existing.error) return response.status(503).json({ error: 'BACKUP_UNAVAILABLE' });
+        if (existing.data) return response.status(409).json({ error: 'ID_CONFLICT' });
         const { error } = await db.from('a02_private_notes').insert({
           id: newId, owner_id: ownerId, title: payload.title.trim(), content: payload.body,
         });
         if (error) return response.status(error.code === '23505' ? 409 : 502)
           .json({ error: error.code === '23505' ? 'ID_CONFLICT' : 'NOTES_UNAVAILABLE' });
+        // Re-read through the same sealed RPC used by recovery. A successful
+        // insert alone does not prove that its trigger/seal is installed.
+        // On failure preserve the row and audit; never manufacture a new seal.
+        const snapshot = await db.rpc('a10_preview_verified_note', {
+          p_note_id: newId, p_owner_id: ownerId,
+        });
+        const expected = text => createHash('sha256').update(text, 'utf8').digest('hex');
+        const verified = snapshot.data;
+        if (snapshot.error || verified?.verified !== true || verified.id !== newId
+            || verified.ownerId !== ownerId || verified.contentHash !== expected(payload.body)
+            || verified.titleHash !== expected(payload.title.trim())
+            || !Array.isArray(verified.changedFields) || verified.changedFields.length !== 0) {
+          return response.status(503).json({ error: 'BACKUP_VERIFICATION_FAILED' });
+        }
         response.setHeader('X-Aleph-Resource-Id', resourceId(RESOURCE_KINDS.note, newId));
         return response.status(201).json({ id: newId });
       }

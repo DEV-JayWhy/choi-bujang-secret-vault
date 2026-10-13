@@ -4,6 +4,7 @@ import { generateKeyPair, exportJWK, SignJWT } from 'jose';
 import collection from '../api/notes.js';
 import detail from '../api/notes/[id].js';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 const config = JSON.parse(readFileSync(new URL('../aleph.config.json', import.meta.url)));
 const response = () => ({ headers: {}, setHeader(k,v) { this.headers[k]=v; }, status(code) { this.code = code; return this; },
   json(body) { this.body = body; return this; } });
@@ -11,7 +12,7 @@ test('A/B own CRUD, cross-owner denial, owner spoof denial and unauthenticated d
   const previousFetch = globalThis.fetch;
   const previousUrl = process.env.SUPABASE_URL, previousKey = process.env.SUPABASE_SECRET_KEY;
   const userId = '11111111-1111-4111-8111-111111111111';
-  const rows = new Map(); let writes = 0;
+  const rows = new Map(), backups = new Map(); let writes = 0;
   const { privateKey, publicKey } = await generateKeyPair('ES256');
   const jwk = await exportJWK(publicKey); Object.assign(jwk, { kid: 'local-test', alg: 'ES256', use: 'sig' });
   const token = await new SignJWT({ role: 'authenticated' }).setProtectedHeader({ alg: 'ES256', kid: jwk.kid })
@@ -33,6 +34,15 @@ test('A/B own CRUD, cross-owner denial, owner spoof denial and unauthenticated d
       const url = new URL(String(input));
       const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
       if (url.pathname.endsWith('jwks.json')) return json({ keys: [jwk] });
+      if (url.pathname === '/rest/v1/a10_note_backups') {
+        const target=url.searchParams.get('note_id')?.slice(3);
+        return json(backups.has(target)?[{note_id:target}]:[]);
+      }
+      if (url.pathname === '/rest/v1/rpc/a10_preview_verified_note') {
+        const {p_note_id:id}=JSON.parse(init.body),row=backups.get(id);
+        const hash=value=>createHash('sha256').update(value).digest('hex');
+        return json({verified:true,id,ownerId:row.owner_id,contentHash:hash(row.content),titleHash:hash(row.title),changedFields:[]});
+      }
       assert.equal(url.pathname, '/rest/v1/a02_private_notes');
       const id = url.searchParams.get('id')?.slice(3);
       const ownerFilter = url.searchParams.get('owner_id')?.slice(3);
@@ -40,7 +50,7 @@ test('A/B own CRUD, cross-owner denial, owner spoof denial and unauthenticated d
       if (init.method === 'POST') {
         writes++; const row = JSON.parse(init.body); assert.ok([userId, bId].includes(row.owner_id));
         if (rows.has(row.id)) return json({ code: '23505' }, 409);
-        rows.set(row.id, row); return new Response(null, { status: 201 });
+        rows.set(row.id, row); backups.set(row.id,{...row}); return new Response(null, { status: 201 });
       }
       if (init.method === 'PATCH') {
         writes++; const changes = JSON.parse(init.body); assert.deepEqual(Object.keys(changes).sort(), ['content', 'title']);
