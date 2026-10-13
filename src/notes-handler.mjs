@@ -114,7 +114,8 @@ export function notesHandler(detail) {
       if (error) return response.status(502).json({ error: 'NOTES_UNAVAILABLE' });
       if (!data) return response.status(404).json({ error: 'NOTE_NOT_FOUND' });
       // Defense in depth: do not return a note unless the DB row confirms ownership.
-      if (request.method === 'GET' && (data.owner_id !== identity.userId
+      if (request.method === 'GET' && (typeof identity.userId !== 'string'
+          || data.owner_id !== identity.userId
           || typeof data.id !== 'string' || data.id.toLowerCase() !== id)) {
         return response.status(404).json({ error: 'NOTE_NOT_FOUND' });
       }
