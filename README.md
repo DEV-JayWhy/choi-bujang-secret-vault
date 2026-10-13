@@ -301,3 +301,43 @@ npm run fixture:7 (종료 코드 0)
 저장점 전 실제 재검증: `npm run decider:test` 4건 통과, 자기 점검은 기존 Production 설정 주소에 HTTP 요청 7건을 보내 기대 조건 모두 일치, 인증된 소유권·소유자 변경·DB 권한 3건은 미실행으로 유지했습니다. `git diff --check` 통과. 저장점 이후 재실행 순서는 `npm run decider:test` → 로컬 전용 bundle-notes.json에 작업 설명과 미검증 범위 기록 → `npm run bundle` → 제출 JSON의 숫자 step 7·HEAD 해시·규칙 2개·변경 파일 4개·점검 항목 10개를 대조하는 순서입니다. bundle-notes.json과 artifacts/submission.json은 커밋하지 않습니다.
 
 이 HTTP 점검은 현재 배포의 기존 API에 대한 결과이며 미푸시 7단계 판정기의 운영 적용을 증명하지 않습니다. 로컬 판정기 시험은 심판 판정이 아닙니다. 실제 운영 엔진의 동일 사용자 재로그인·새 인증 시각 검증, 실제 추가 인증 전 자료 차단/완료 뒤 자료 허용, mTLS·사용자/기기 조합, 운영 이유 코드 등록부는 미검증입니다. 기존 test:package 불일치는 미해결이고 이번 범위에서 재실행하지 않습니다. 기존 Actions는 5단계 전용이며 변경하거나 실행하지 않습니다. GitHub 푸시·배포·실제 제출은 보류합니다. 인증서·개인키·서버 비밀값은 생성하지 않습니다.
+
+
+## 8단계 제작 1: 자원 ID 표시 (미커밋)
+
+기준 HEAD는 `befcc729fa0177e58ee1d18631a2a10f5c1fa65f`이며 7단계 저장점의 구현 기록과 일치합니다. 해당 커밋은 GitHub main에 푸시 완료했습니다. 위 7단계의 미푸시 설명은 당시 작업 범위 기록입니다. 이번 8단계는 커밋·bundle 생성·푸시·제출을 수행하지 않습니다.
+
+조사 결과 기존 메모 API는 `api/notes.js`, `api/notes/[id].js`가 `src/notes-handler.mjs`를 사용하며 DB의 `a02_private_notes`에서 자료를 읽습니다. 서버 검증 identity.userId와 저장된 owner_id를 비교하고 POST/PUT owner_id 위조는 거부합니다. 저장소에는 강사 공지 테이블·자료·API·강사 권한 검증 구조가 없습니다. public/index.html의 notice 클래스는 로그인 안내 표시이며 강사 공지 자원이 아닙니다.
+
+자원 ID는 `src/resource-ids.mjs`에서 서버가 선택한 이름 공간과 UUID로 만듭니다. 이름 공간을 분리해 같은 UUID라도 메모와 공지 ID가 다릅니다. UUID는 기존 행 ID를 변경하지 않고 표시용 ID 안에서만 소문자로 정규화합니다. ID는 소유권·강사 권한·DB 행 존재의 증명이 아닙니다.
+
+| 자원 | 표시 ID | 구현 범위 |
+| --- | --- | --- |
+| 메모 목록 | private_note:collection | 기존 인증된 목록 API의 응답 헤더 |
+| 개별 메모 | private_note:<기존 UUID> | 기존 인증된 상세 요청의 응답 헤더, 생성 성공 후 새 UUID 표시 |
+| 강사 공지 | instructor_notice:<UUID> | 이름 공간만 예약. 실제 공지 저장소·UUID·주소가 없어 연결하지 않음 |
+
+기존 API 응답의 `X-Aleph-Resource-Id` 헤더에 표시하며 JSON의 id/title/body 형식과 목록 배열·생성/삭제 응답은 보존합니다. 상세의 ID 형식 검사 및 기존 인증 뒤 헤더를 설정하고, 이후 기존 DB 소유권 검사는 그대로 수행합니다. 거부 응답에 표시된 요청 대상 ID가 해당 행 존재를 증명하는 것은 아닙니다. 목록의 헤더는 목록 자원 하나를 표시하며 각 행의 기존 id로 개별 표시 ID를 만들 수 있습니다. 클라이언트가 자원 종류·role·owner를 선택하도록 변경하지 않습니다.
+
+판정기 계약은 사용자 `subjectId`, 기기 `deviceId`/`deviceRegistered`, 동작 `method`, 자원 경로 `service`/`path`/`route`를 제공합니다. 별도 resourceId·role 필드는 없습니다. 표시 ID를 엔진 요청에 덧붙이지 않으며, subjectId는 DB 사용자 UUID와 직접 비교하지 않습니다. 엔진 경로 예시 `/notes/:id`와 앱 `/api/notes/:id`의 대응, subjectId와 DB 사용자 매핑, 강사 권한의 검증된 출처는 제작 2·3 전에 확인해야 합니다.
+
+실제 로컬 시험: 의존성 누락(jose)으로 기존 API 시험이 처음 시작하지 못해 기존 lockfile대로 `npm ci --ignore-scripts --no-audit --no-fund`를 실행했습니다. package.json/lockfile은 변경하지 않았습니다. 이후 기존 Bearer·HttpOnly 쿠키 A/B CRUD·타인 404·소유자 위조 거부·무인증 거부 시험 2건 모두 통과했습니다. 기존 시험을 저장소 밖 임시 사본에서 확장해 정상 목록·생성·상세 GET/PUT/DELETE의 자원 헤더와 원래 JSON 응답 호환성을 확인한 시험 1건도 통과했습니다. UUID 정규화·이름 공간 구분·잘못된 ID/기능명/export/헤더 삽입 거부 검사 통과, `npm run decider:test` 기존 4건 통과, `git diff --check` 통과. 기존 테스트 파일은 변경하지 않았습니다. 실제 DB·운영 배포에서 재실행한 시험이 아닙니다.
+
+현재 변경 파일: `src/resource-ids.mjs`, `src/notes-handler.mjs`, `README.md`. 기존 DB 자료·API 주소·화면·인증·소유권 검사·6/7단계 판정 규칙은 보존합니다. 화면 메뉴·새 기능 경로·export 경로를 추가하지 않았습니다. 8단계 구역 권한 규칙·강사 공지 API 보호는 미구현이며 제작 2·3 범위입니다. 실제 강사 공지 자원 연결은 기존 자료의 저장 위치·주소·ID 계약을 확보한 뒤 진행해야 합니다.
+
+재실행 명령: `node --test test/notes-ownership.test.mjs test/notes-cookie.test.mjs`. 화면 확인은 기존 자료실 로그인 → 메모 조회 후 개발자 도구 Network의 해당 응답 헤더 확인이며 이번 작업에서 실제 브라우저 확인은 미실행입니다.
+
+
+## 8단계 저장점 — 서버 자원 선택과 소유권 회귀
+
+제작 1의 자원 표시 ID를 유지하고, 상세 메모는 서버의 실제 요청 URL `/api/notes/<UUID>`에서 선택합니다. 프레임워크가 합친 `query.id`는 자원 선택에 사용하지 않습니다. 동일한 ID 쿼리는 허용하되 경로와 다른 ID, 중복 ID, 기능·역할·소유자 선택 쿼리는 400 INVALID_ID로 거부합니다. 목록 API에는 쿼리 필터가 없어 쿼리 ID 지정도 거부합니다. 잘못된 상세 경로와 export ID도 거부하며 기존 주소·응답 JSON·화면은 유지합니다.
+
+실제 로그인 검증 도우미의 사용자 UUID와 DB owner_id 필터를 보존했습니다. 개별 조회·수정·삭제는 id와 검증된 owner_id를 함께 비교하고 목록은 검증된 사용자 소유 자료만 반환합니다. 요청 본문의 role/ownerId는 권한 근거로 쓰지 않고 owner_id 변경은 기존처럼 거부합니다. subjectId를 DB UUID로 비교하지 않습니다.
+
+검증 순서: `node --test test/notes-ownership.test.mjs test/notes-cookie.test.mjs test/server-auth.test.mjs` → `npm run decider:test` → `git diff --check`. 첫 명령은 로컬 HTTP 서버와 격리된 모의 DB, 쿠키 전송, URL 검사, 기존 인증 검증을 시험합니다. A 자기 조회·수정 허용, B의 A 개별 GET/PUT/DELETE 404, B 목록에는 B 자료만 반환, 쿼리 ID 충돌·중복·기능 지정 400 및 DB 쓰기 없음, 허용되지 않은 API 메서드 405를 확인했습니다. 실제 사용자 세션이나 운영 DB 자료를 생성·수정·삭제하지 않았습니다. 시험용 서명 값은 실행 메모리 안에서만 사용하며 출력하거나 저장하지 않습니다.
+
+6·7단계 판정 시험 4건(정상 allow, 미등록 deny/device_not_registered, 복합 step_up/step_up_required, 완료 모의 allow)은 모두 통과하고 판정기 코드는 변경하지 않았습니다. 운영 allowedReasonCodes와 `/notes/:id`↔`/api/notes/:id` 공식 매핑을 확보하지 못해 판정기 서비스·메서드·경로 규칙은 미구현입니다. 기존 이유 코드를 다른 거부에 재사용하거나 새 코드를 임의 생성하지 않았습니다. 기존 판정기는 알 수 없는 경로를 독립 거부하지 못하므로 8단계 전체 완료로 보고하지 않습니다.
+
+강사 공지는 예약 자원 이름만 있고 실제 API·DB·검증된 강사 권한이 없어 구현하지 않았습니다. 학생의 공지 수정 차단은 실제 공지 자원으로 시험하지 못했습니다. 세 가지 메모 공격은 로컬 서버·모의 DB에서 확인했지만 운영 배포와 심판 4종 공격의 실제 통과는 미검증입니다. 경로/쿼리 처리의 Vercel 배포 검증, mTLS·사용자/기기 조합, 운영 재로그인 검증도 남아 있습니다.
+
+설정 step을 숫자 8로 변경하고 자기 점검의 8단계 지원만 추가했습니다. 기존 HTTP 점검 7개와 미실행 점검 3개를 유지하며 판정기 경로 정책 미구현·강사 공지 미실행 항목을 추가했습니다. bundle HTTP 점검 대상은 아직 푸시하지 않은 이번 변경이 아닌 기존 Production 배포입니다. 기존 Actions·빌드·bundle 스크립트·커밋 이력은 보존합니다. GitHub 푸시·배포·실제 심판 제출은 수행하지 않습니다.

@@ -1,13 +1,16 @@
 import { test } from 'node:test';
+import { createServer, request as httpRequest } from 'node:http';
+import { once } from 'node:events';
 import assert from 'node:assert/strict';
 import { generateKeyPair, exportJWK, SignJWT } from 'jose';
 import collection from '../api/notes.js';
 import detail from '../api/notes/[id].js';
+import { inspectNoteUrl } from '../src/notes-handler.mjs';
 import { readFileSync } from 'node:fs';
 const config = JSON.parse(readFileSync(new URL('../aleph.config.json', import.meta.url)));
 const response = () => ({ headers: {}, setHeader(k,v) { this.headers[k]=v; }, status(code) { this.code = code; return this; },
   json(body) { this.body = body; return this; } });
-test('A/B own CRUD, cross-owner denial, owner spoof denial and unauthenticated denial (mock DB)', async () => {
+test('A/B own CRUD, cross-owner denial, owner spoof denial and unauthenticated denial (local HTTP server, mock DB)', async () => {
   const previousFetch = globalThis.fetch;
   const previousUrl = process.env.SUPABASE_URL, previousKey = process.env.SUPABASE_SECRET_KEY;
   const userId = '11111111-1111-4111-8111-111111111111';
@@ -23,8 +26,35 @@ test('A/B own CRUD, cross-owner denial, owner spoof denial and unauthenticated d
     .setSubject(bId).setIssuer(config.identityProvider.issuer).setAudience('authenticated')
     .setIssuedAt().setExpirationTime('5m').sign(privateKey);
   const bHeaders = { authorization: `Bearer ${bToken}` };
-  async function call(handler, method, body, id, auth = headers) {
-    const res = response(); await handler({ method, body, headers: auth, query: { id, userId: 'spoof', role: 'admin' } }, res); assert.equal(res.headers['X-Content-Type-Options'],'nosniff'); return res;
+  const server = createServer(async (req, res) => {
+    const parsed = new URL(req.url, 'http://127.0.0.1');
+    const route = /^\/api\/notes\/([^/]+)$/u.exec(parsed.pathname);
+    if (parsed.pathname !== '/api/notes' && !route) {
+      res.writeHead(404); res.end('{}'); return;
+    }
+    const parts = [];
+    for await (const part of req) parts.push(part);
+    req.body = Buffer.concat(parts).toString() || undefined;
+    req.query = { id: route?.[1], ...Object.fromEntries(parsed.searchParams) };
+    res.status = code => { res.statusCode = code; return res; };
+    res.json = body => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(body)); return res; };
+    await (route ? detail : collection)(req, res);
+  });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  async function call(handler, method, body, id, auth = headers, suffix = '') {
+    const path = `${handler === detail ? `/api/notes/${id}` : '/api/notes'}${suffix}`;
+    const encoded = body === undefined ? undefined : JSON.stringify(body);
+    const result = await new Promise((resolve, reject) => {
+      const req = httpRequest({host:'127.0.0.1', port:server.address().port, path, method,
+        headers:{...auth, 'Content-Type':'application/json', ...(encoded === undefined ? {} : {'Content-Length':Buffer.byteLength(encoded)})}}, res => {
+        const parts=[]; res.on('data', part => parts.push(part));
+        res.on('end', () => resolve({code:res.statusCode, headers:res.headers,
+          body:JSON.parse(Buffer.concat(parts).toString())}));
+      });
+      req.on('error',reject); req.end(encoded);
+    });
+    assert.equal(result.headers['x-content-type-options'],'nosniff'); return result;
   }
   try {
     process.env.SUPABASE_URL = new URL(config.identityProvider.issuer).origin;
@@ -57,6 +87,12 @@ test('A/B own CRUD, cross-owner denial, owner spoof denial and unauthenticated d
     }
     assert.equal((await call(collection, 'GET', undefined, undefined, { authorization: 'Bearer invalid' })).code, 401);
     assert.equal(writes, 0);
+    for (const [handler, method] of [[collection, 'PUT'], [detail, 'POST'], [detail, 'PATCH']]) {
+      assert.equal((await call(handler, method, {}, userId)).code, 405);
+    }
+    assert.equal((await call(detail, 'GET', undefined, 'export')).code, 400);
+    assert.equal(writes, 0);
+
     const added = await call(collection, 'POST', { title: 'test', body: 'test body', role: 'admin' });
     assert.equal(added.code, 201); const id = added.body.id; assert.match(id, /^[0-9a-f-]{36}$/);
     let res = await call(detail, 'GET', undefined, id); assert.deepEqual(res.body, { id, title: 'test', body: 'test body' });
@@ -68,12 +104,22 @@ test('A/B own CRUD, cross-owner denial, owner spoof denial and unauthenticated d
     }
     assert.equal(rows.get(id).owner_id, userId);
     assert.equal(rows.get(id).title, 'changed');
+    assert.equal((await call(detail, 'GET', undefined, id, headers, `?id=${id}`)).code, 200);
+    for (const suffix of [`?id=${bId}`, `?id=${id}&id=${id}`, '?action=export', '?role=admin', '?ownerId=spoof']) {
+      const before = writes;
+      for (const method of ['GET', 'PUT', 'DELETE']) {
+        assert.equal((await call(detail, method, {title:'intruder',body:''}, id, headers, suffix)).code, 400);
+      }
+      assert.equal(writes, before);
+    }
+    assert.equal((await call(collection, 'GET', undefined, undefined, bHeaders, `?id=${id}`)).code, 400);
+
     assert.equal((await call(detail, 'PUT', {title:'changed',body:'',owner_id:bId}, id)).code, 400);
     assert.equal((await call(collection, 'POST', {title:'spoof',body:'',owner_id:bId})).code, 400);
     const bAdded = await call(collection, 'POST', {title:'B test',body:''}, undefined, bHeaders);
     assert.equal(bAdded.code, 201); const bid = bAdded.body.id;
     assert.equal(rows.get(bid).owner_id, bId);
-    assert.equal((await call(collection, 'GET', undefined, undefined, bHeaders)).body.length, 1);
+    assert.deepEqual((await call(collection, 'GET', undefined, undefined, bHeaders)).body.map(row => row.id), [bid]);
     assert.equal((await call(collection, 'GET')).body.length, 1);
     for (const method of ['GET', 'PUT', 'DELETE']) {
       assert.equal((await call(detail, method, method === 'PUT' ? {title:'intruder',body:''} : undefined, bid)).code, 404);
@@ -91,8 +137,21 @@ test('A/B own CRUD, cross-owner denial, owner spoof denial and unauthenticated d
     assert.deepEqual((await call(collection, 'POST', { id: suppliedId, title: 'test', body: '' })).body, { id: suppliedId });
     assert.equal((await call(collection, 'POST', { id: suppliedId, title: 'test', body: '' })).code, 409);
   } finally {
+    await new Promise(resolve => server.close(resolve));
     globalThis.fetch = previousFetch;
     if (previousUrl === undefined) delete process.env.SUPABASE_URL; else process.env.SUPABASE_URL = previousUrl;
     if (previousKey === undefined) delete process.env.SUPABASE_SECRET_KEY; else process.env.SUPABASE_SECRET_KEY = previousKey;
   }
+});
+
+test('exact note URL parsing cannot be replaced by query IDs, headers or normalization', () => {
+  const id='11111111-1111-4111-8111-111111111111';
+  assert.deepEqual(inspectNoteUrl({url:`/api/notes/${id}`,query:{id:'spoof'}},true),{id});
+  for (const url of [undefined, '/notes/'+id, '/api/notes/export', '/api/notes/'+id+'/',
+    '/api/notes/%31'+id.slice(1), '/API/notes/'+id, '/api/notes/../notes/'+id,
+    '/api/notes/'+id+'#fragment', '/api/notes/'+id+'?id='+id+'&id='+id]) {
+    assert.equal(inspectNoteUrl({url,query:{id},headers:{'x-original-url':'/api/notes/'+id}},true),null);
+  }
+  assert.equal(inspectNoteUrl({url:'/api/notes?operation=export'},false),null);
+  assert.deepEqual(inspectNoteUrl({url:'/api/notes'},false),{id:undefined});
 });

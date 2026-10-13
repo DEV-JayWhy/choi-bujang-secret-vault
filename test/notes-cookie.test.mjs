@@ -23,8 +23,8 @@ test('A/B own CRUD, cross-owner denial, owner spoof denial and unauthenticated d
     .setSubject(bId).setIssuer(config.identityProvider.issuer).setAudience('authenticated')
     .setIssuedAt().setExpirationTime('5m').sign(privateKey);
   const bHeaders = { cookie: `__Host-vault-access=${bToken}`, origin: config.publicAppUrl };
-  async function call(handler, method, body, id, auth = headers) {
-    const res = response(); await handler({ method, body, headers: auth, query: { id, userId: 'spoof', role: 'admin' } }, res); assert.equal(res.headers['X-Content-Type-Options'],'nosniff'); return res;
+  async function call(handler, method, body, id, auth = headers, suffix = "") {
+    const res = response(); await handler({ url: `${handler === detail ? `/api/notes/${id}` : "/api/notes"}${suffix}`, method, body, headers: auth, query: { id, userId: 'spoof', role: 'admin' } }, res); assert.equal(res.headers['X-Content-Type-Options'],'nosniff'); return res;
   }
   try {
     process.env.SUPABASE_URL = new URL(config.identityProvider.issuer).origin;
@@ -58,6 +58,12 @@ test('A/B own CRUD, cross-owner denial, owner spoof denial and unauthenticated d
     assert.equal((await call(collection, 'GET', undefined, undefined, { authorization: 'Bearer invalid' })).code, 401);
     assert.equal((await call(collection, 'POST', {title:'csrf',body:''}, undefined, {...headers, origin:'https://other.invalid'})).code, 403);
     assert.equal(writes, 0);
+    for (const [handler, method] of [[collection, 'PUT'], [detail, 'POST'], [detail, 'PATCH']]) {
+      assert.equal((await call(handler, method, {}, userId)).code, 405);
+    }
+    assert.equal((await call(detail, 'GET', undefined, 'export')).code, 400);
+    assert.equal(writes, 0);
+
     const added = await call(collection, 'POST', { title: 'test', body: 'test body', role: 'admin' });
     assert.equal(added.code, 201); const id = added.body.id; assert.match(id, /^[0-9a-f-]{36}$/);
     let res = await call(detail, 'GET', undefined, id); assert.deepEqual(res.body, { id, title: 'test', body: 'test body' });
@@ -69,12 +75,22 @@ test('A/B own CRUD, cross-owner denial, owner spoof denial and unauthenticated d
     }
     assert.equal(rows.get(id).owner_id, userId);
     assert.equal(rows.get(id).title, 'changed');
+    assert.equal((await call(detail, 'GET', undefined, id, headers, `?id=${id}`)).code, 200);
+    for (const suffix of [`?id=${bId}`, `?id=${id}&id=${id}`, '?action=export', '?role=admin', '?ownerId=spoof']) {
+      const before = writes;
+      for (const method of ['GET', 'PUT', 'DELETE']) {
+        assert.equal((await call(detail, method, {title:'intruder',body:''}, id, headers, suffix)).code, 400);
+      }
+      assert.equal(writes, before);
+    }
+    assert.equal((await call(collection, 'GET', undefined, undefined, bHeaders, `?id=${id}`)).code, 400);
+
     assert.equal((await call(detail, 'PUT', {title:'changed',body:'',owner_id:bId}, id)).code, 400);
     assert.equal((await call(collection, 'POST', {title:'spoof',body:'',owner_id:bId})).code, 400);
     const bAdded = await call(collection, 'POST', {title:'B test',body:''}, undefined, bHeaders);
     assert.equal(bAdded.code, 201); const bid = bAdded.body.id;
     assert.equal(rows.get(bid).owner_id, bId);
-    assert.equal((await call(collection, 'GET', undefined, undefined, bHeaders)).body.length, 1);
+    assert.deepEqual((await call(collection, 'GET', undefined, undefined, bHeaders)).body.map(row => row.id), [bid]);
     assert.equal((await call(collection, 'GET')).body.length, 1);
     for (const method of ['GET', 'PUT', 'DELETE']) {
       assert.equal((await call(detail, method, method === 'PUT' ? {title:'intruder',body:''} : undefined, bid)).code, 404);

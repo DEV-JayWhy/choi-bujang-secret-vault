@@ -33,7 +33,7 @@ async function runFirstStageChecks(config) {
 
 export async function runAttackChecks(config) {
   if (config.step === 1) return runFirstStageChecks(config);
-  if (![3, 4, 5, 6, 7].includes(config.step)) throw new Error('현재 자기 점검은 1·3·4·5·6·7단계에만 구현되어 있습니다.');
+  if (![3, 4, 5, 6, 7, 8].includes(config.step)) throw new Error('현재 자기 점검은 1·3·4·5·6·7·8단계에만 구현되어 있습니다.');
   const app = new URL(config.publicAppUrl);
   if (app.protocol !== 'https:' || app.username || app.password || app.search || app.hash || app.pathname !== '/') {
     throw new Error('실제 배포 주소를 확인해 주세요.');
@@ -72,10 +72,14 @@ export async function runAttackChecks(config) {
       return { attackId, expected, observed: '요청 실패 또는 시간 초과: HTTP 상태·자료 반환 여부 미확인' };
     }
   }));
-  if ([4, 5, 6, 7].includes(config.step)) results.push(
+  if ([4, 5, 6, 7, 8].includes(config.step)) results.push(
     { attackId: 'cross_owner_note_access', expected: '타인 메모 GET·PUT·DELETE는 자료 없이 404', observed: '미실행: 이 환경에서 실제 A/B 로그인 세션으로 재검증하지 않음; 사용자 B→A 404 보고와 구분' },
     { attackId: 'owner_change_rejected', expected: 'POST·PUT 본문 owner_id 변경 시도는 400으로 거부', observed: '미실행: 실제 배포의 인증된 소유자 변경 요청은 재검증하지 않음' },
     { attackId: 'database_rls_privileges', expected: config.step >= 5 ? '기존 소유자 RLS 유지, anon·authenticated 직접 권한 없음, service_role CRUD 유지' : '소유자 RLS 4개, anon 권한 없음, authenticated CRUD만 허용, service_role 유지', observed: '미실행: DB 관리자 연결 없이 독립 조회하지 않음; 사용자 적용·검증 보고와 구분' }
+  );
+  if (config.step === 8) results.push(
+    { attackId: 'stage8_decider_path_policy', expected: '판정기에서 알 수 없는 서비스·메서드·경로 거부', observed: '미구현: 공식 경로 매핑과 경로 거부용 allowedReasonCodes 미확인; 기존 6·7단계 규칙 보존' },
+    { attackId: 'instructor_notice_authorization', expected: '검증된 강사만 실제 강사 공지를 수정', observed: '미실행: 실제 공지 API·DB와 검증된 강사 권한 근거 없음; 공지 API를 신설하거나 권한을 부여하지 않음' }
   );
   return results;
 }

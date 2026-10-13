@@ -3,11 +3,27 @@ import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { cookieToken, sameOrigin } from './server-auth.mjs';
 import { createLoginVerifier } from './verify-login.mjs';
+import { RESOURCE_KINDS, NOTES_COLLECTION_RESOURCE_ID, resourceId } from './resource-ids.mjs';
 
 const config = JSON.parse(readFileSync(new URL('../aleph.config.json', import.meta.url), 'utf8'));
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 let verifyLogin;
 const note = row => ({ id: row.id, title: row.title, body: row.content });
+
+// Use the incoming URL, not a framework-merged query.id, to select the resource.
+export function inspectNoteUrl(request, detail) {
+  if (typeof request.url !== 'string') return null;
+  const [path, ...search] = request.url.split('?');
+  if (search.length > 1 || request.url.includes('#')) return null;
+  const match = detail ? /^\/api\/notes\/([0-9a-fA-F-]+)$/u.exec(path) : null;
+  const id = match?.[1];
+  if (detail ? !id || !UUID.test(id) : path !== '/api/notes') return null;
+  const params = new URLSearchParams(search[0] ?? '');
+  // There are no query-selected functions or collection filters in this API.
+  if ([...params.keys()].some(key => key !== 'id') || params.getAll('id').length > 1) return null;
+  if (params.has('id') && (!detail || params.get('id')?.toLowerCase() !== id.toLowerCase())) return null;
+  return { id: detail ? id.toLowerCase() : undefined };
+}
 
 export function notesHandler(detail) {
   return async (request, response) => {
@@ -37,10 +53,14 @@ export function notesHandler(detail) {
       verifyLogin ??= createLoginVerifier({ config, supabaseSecretKey: key });
       const identity = await verifyLogin(authorization);
       if (!identity) return response.status(401).json({ error: 'LOGIN_REQUIRED' });
-      const id = detail ? request.query?.id : undefined;
-      if (detail && (typeof id !== 'string' || !UUID.test(id))) {
+      const resource = inspectNoteUrl(request, detail);
+      if (!resource) {
         return response.status(400).json({ error: 'INVALID_ID' });
       }
+      const { id } = resource;
+      // 서버가 선택한 메모 이름 공간만 표시하며, 기존 소유권 검사는 그대로 수행합니다.
+      response.setHeader('X-Aleph-Resource-Id', detail
+        ? resourceId(RESOURCE_KINDS.note, id) : NOTES_COLLECTION_RESOURCE_ID);
       let payload;
       if (['POST', 'PUT'].includes(request.method)) {
         try { payload = typeof request.body === 'string' ? JSON.parse(request.body) : request.body; }
@@ -71,6 +91,7 @@ export function notesHandler(detail) {
         });
         if (error) return response.status(error.code === '23505' ? 409 : 502)
           .json({ error: error.code === '23505' ? 'ID_CONFLICT' : 'NOTES_UNAVAILABLE' });
+        response.setHeader('X-Aleph-Resource-Id', resourceId(RESOURCE_KINDS.note, newId));
         return response.status(201).json({ id: newId });
       }
       // DB가 비교하는 소유자는 기존 도우미가 검증한 ID뿐입니다.
