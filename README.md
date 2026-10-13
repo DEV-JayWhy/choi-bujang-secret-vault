@@ -373,3 +373,7 @@ zone_grant 규칙과 zone_denied 이유 코드는 공개 2026-09-26 r1 원고에
 기준 b2203ff4af0b의 공식 결과는 48/100점, S08_OTHER_ZONE_ALLOWED입니다. 현재 수정은 경로와 같은 단일 id 쿼리만 판정기에서 허용하고, 최종 API에서 목록의 모든 owner_id 및 개별 GET의 요청 ID를 반환 전에 재대조합니다. 기존 인증·DB 소유자 필터·정상 기본 목록·demo/UUID·6/7단계 정책은 유지합니다. 강사 공지 API·DB는 저장소에 없으며 학생에게 공지 쓰기를 허용하지 않습니다. 세부 근거와 가설은 docs/STAGE8_POLICY_REVIEW.md에 기록했습니다.
 
 재실행: node --test test/stage8-policy-regression.test.mjs test/stage8-routes.test.mjs test/stage6-7-regression.test.mjs test/notes-ownership.test.mjs test/notes-cookie.test.mjs test/server-auth.test.mjs test/attack-check-readonly.test.mjs. 관련 테스트 42개 통과, npm run decider:test 4개 통과, npm run fixture:7 정상 allow·복합 step_up, npm run build -- --local 통과. 실제 배포·심판은 커밋 후 검증하며 로컬 테스트를 공식 성공으로 표현하지 않습니다.
+
+### 8단계 제출 전 준비 — 판정기 모듈 의존성 제거
+
+6948aa262b80의 공식 0점(S08_OWN_BROKEN) 후 실행환경 차이를 분리하기 위해 판정기의 node:crypto import를 제거했습니다. 허용·거부 정책과 API는 유지하며 기존 ID 쿼리 SHA-256 비교를 순수 JavaScript로 대체합니다. test/decider-runtime.test.mjs에서 독립 해시 결과 및 모듈 로더/Node API 없는 VM 실행을 검증했습니다. 관련 테스트 44개, decider:test 4개, fixture:7, 로컬 빌드 통과. 공식 심판은 사용자가 직접 제출하며 이 버전의 점수는 아직 미확인입니다.
