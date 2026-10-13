@@ -114,6 +114,11 @@ export function inspectNoteRoute(request) {
   const match = /^\/notes\/([^/?#]+)$/u.exec(path);
   if (!match) return false;
   const id = match[1];
+  // Read a note only by its canonical path. A query-selected item is a second
+  // resource selector and must not widen the GET authorization scope.
+  if (method === 'GET' && NOTE_UUID.test(id)) {
+    return request.queryLength === 0 && request.querySha256 === EMPTY_QUERY_SHA256;
+  }
   return (id === 'demo' || NOTE_UUID.test(id)) && querySelectsExactId(request, id);
 }
 
