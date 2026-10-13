@@ -4,6 +4,7 @@ import { cookieToken, sameOrigin } from './server-auth.mjs';
 import { createLoginVerifier } from './verify-login.mjs';
 import { noteOwnerId } from './judge-ownership.mjs';
 import { checkAfterRestore } from './post-restore-retest.mjs';
+import { recordRecoveryObservation } from './recovery-observation.mjs';
 
 const config = JSON.parse(readFileSync(new URL('../aleph.config.json', import.meta.url), 'utf8'));
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
@@ -83,7 +84,7 @@ function validPreview(data, id, owner) {
 
 // The only real side effect is an atomic DB function acting on one verified
 // owner+UUID. Runtime functions never decide actual owners from client input.
-export function createRecoveryHandler(policy = false, { verify, makeClient, retest } = {}) {
+export function createRecoveryHandler(policy = false, { verify, makeClient, retest, observe } = {}) {
   return async (request, response) => {
     cleanResponse(response);
     if (!['GET','POST'].includes(request.method)) {
@@ -119,6 +120,13 @@ export function createRecoveryHandler(policy = false, { verify, makeClient, rete
         auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
       });
 
+      // Forensic checkpoints describe only signed callers, never subject/data IDs.
+      // Telemetry is best-effort; an observability outage must not break recovery.
+      const record = async (checkpoint, reason) => {
+        try {
+          await (observe || recordRecoveryObservation)(db, identity.kind, checkpoint, reason);
+        } catch { /* fail closed on private data, not telemetry availability */ }
+      };
       if (policy) {
         if (request.method === 'GET') {
           const { data, error } = await db.rpc('a10_policy_diff');
@@ -143,6 +151,7 @@ export function createRecoveryHandler(policy = false, { verify, makeClient, rete
         return response.status(200).json(data);
       }
 
+      await record('auth_verified', 'authenticated');
       const ownerId = noteOwnerId(identity);
       const target = selected.id ?? payload.id ?? payload.noteId;
       if (!UUID.test(target ?? '') ||
@@ -163,16 +172,23 @@ export function createRecoveryHandler(policy = false, { verify, makeClient, rete
       const { data: preview, error: previewError } = await db.rpc('a10_preview_verified_note', {
         p_note_id: id, p_owner_id: ownerId,
       });
-      if (previewError) return errorResponse(response, previewError);
+      if (previewError) {
+        await record('backup_rejected', previewError.code === 'P0002' ? 'not_found'
+          : previewError.code === '23514' ? 'integrity_failed' : 'unavailable');
+        return errorResponse(response, previewError);
+      }
       if (!validPreview(preview, id, ownerId)) {
+        await record('backup_rejected', 'integrity_failed');
         return response.status(409).json({ error: 'BACKUP_VERIFICATION_FAILED' });
       }
+      await record('backup_verified', 'verified_snapshot');
       if (request.method === 'GET' || payload.preview === true) {
         return response.status(200).json(preview);
       }
       if ((payload.expectedVersion && payload.expectedVersion !== preview.backupVersion)
           || (payload.expectedState && payload.expectedState !== preview.stateVersion)
           || (payload.expectedHash && payload.expectedHash !== preview.contentHash)) {
+        await record('version_rejected', 'version_changed');
         return response.status(409).json({ error: 'BACKUP_VERIFICATION_FAILED' });
       }
       // Atomic DB routine locks target rows, RE-READS backup+seal/current state,
@@ -182,15 +198,20 @@ export function createRecoveryHandler(policy = false, { verify, makeClient, rete
         p_expected_version: preview.backupVersion,
         p_expected_state: preview.stateVersion,
       });
-      if (error) return errorResponse(response, error);
+      if (error) {
+        await record('restore_rejected', error.code === '23514' ? 'version_changed' : 'db_rejected');
+        return errorResponse(response, error);
+      }
       if (!data || data.verified !== true || data.restored !== true
           || data.id !== id || data.ownerId !== ownerId
           || data.backupVersion !== preview.backupVersion
           || data.contentHash !== preview.contentHash
           || data.retest?.ownRowVerified !== true
           || data.retest?.foreignOwnerSameIdNotVisible !== true) {
+        await record('restore_rejected', 'integrity_failed');
         return response.status(503).json({ error: 'RESTORE_UNAVAILABLE' });
       }
+      await record('restore_committed', 'committed');
       // These actual read-only rechecks start only after the verified DB commit.
       // Failures are explicit and do not falsify or undo a completed restore.
       let after;
@@ -204,6 +225,8 @@ export function createRecoveryHandler(policy = false, { verify, makeClient, rete
           checks: [], allExecutedChecksPassed: false,
           judgeFullReplay: 'not_run' };
       }
+      await record(after.allExecutedChecksPassed === true ? 'retest_passed' : 'retest_failed',
+        after.allExecutedChecksPassed === true ? 'checks_passed' : 'checks_failed');
       return response.status(200).json({ ...data, postRestoreRetest: after });
     } catch {
       return response.status(503).json({ error: 'RESTORE_UNAVAILABLE' });
