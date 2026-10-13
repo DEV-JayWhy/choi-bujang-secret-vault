@@ -35,3 +35,33 @@ jobs:
             }
           }
           NODE
+
+      - name: Verify production deployment identity matches current main
+        env:
+          PUBLIC_URL: https://choi-bujang-secret-vault-xi.vercel.app
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          node --input-type=module <<'NODE'
+          let latest=null;
+          for(let attempt=0;attempt<12;attempt++){
+            try{
+              const r=await fetch(process.env.PUBLIC_URL+'/aleph.json',{
+                cache:'no-store',redirect:'manual',signal:AbortSignal.timeout(8000)});
+              if(r.status===200){
+                const identity=await r.json();
+                latest={status:r.status,commit:identity.commit,
+                  app:identity.publicAppUrl,step:identity.step};
+                if(identity.commit===process.env.EXPECTED_SHA
+                  && identity.step>=10
+                  && identity.publicAppUrl===process.env.PUBLIC_URL+'/'){
+                  console.log('PRODUCTION_CURRENT_SHA_READY',
+                    JSON.stringify({step:identity.step,shaMatches:true,urlMatches:true}));
+                  process.exit(0);
+                }
+              }else latest={status:r.status};
+            }catch{latest={status:'transport_failed'};}
+            await new Promise(resolve=>setTimeout(resolve,5000));
+          }
+          console.log('DEPLOYMENT_IDENTITY_NOT_YET_CURRENT',JSON.stringify(latest));
+          process.exit(1);
+          NODE
