@@ -1,6 +1,12 @@
 # ALEPH BYTE BACK — 10단계 검증된 사본 복원
 
-현재 단계는 **10**입니다. 공개 Production은 https://choi-bujang-secret-vault-xi.vercel.app 이고 저장소는 https://github.com/DEV-JayWhy/choi-bujang-secret-vault 입니다. 현재 배포 커밋은 `GET /aleph.json`의 `commit`으로 확인합니다. 예전 단계별 작업 기록은 [보존한 이력](docs/history/stage1-to-stage10.md)에 있습니다. 이력의 과거 공개 API·단계 숫자는 현재 동작 설명이 아닙니다.
+현재 후보 단계는 **11**입니다. 공개 Production은 https://choi-bujang-secret-vault-xi.vercel.app 이고 저장소는 https://github.com/DEV-JayWhy/choi-bujang-secret-vault 입니다. 현재 배포 커밋은 `GET /aleph.json`의 `commit`으로 확인합니다. 예전 단계별 작업 기록은 [보존한 이력](docs/history/stage1-to-stage10.md)에 있습니다. 이력의 과거 공개 API·단계 숫자는 현재 동작 설명이 아닙니다.
+
+## 최종 10단계 기준점과 11단계 준비
+
+10단계 기준점은 `d2bc9e76a2c2c8dfef068074c75904409eceead8`입니다. 사용자가 이 커밋의 실제 심판 100/100 통과를 전달했고, 2026-10-14 KST 클라우드 브라우저의 실제 방어전 상황실에서도 10단계 「막아 냈습니다」를 확인했습니다. 아래 12점 기록은 이전 커밋의 과정 기록입니다. 새로 받은 main과 Vercel Production READY의 SHA도 기준점과 일치했습니다.
+
+11단계 1차 후보는 접속 화면 준비 상태이며 실제 심판 결과로 승인·서명 요구사항을 추가 확인합니다. manifest, 설치 여부 표시, 보호 자료를 저장하지 않는 오프라인 안내만 로컬에 추가했습니다. 공식 승인 요청과 요청 서명 계약은 미확보입니다. 현재 준비 화면의 기기 상태는 「확인되지 않음」이며 이를 승인으로 취급하지 않습니다. 기존 인증·메모·복원 API는 변경하지 않았습니다. 자세한 조사 범위는 [11단계 계약 조사](docs/STAGE11_CONTRACT_REVIEW.md)에 있습니다.
 
 ## 제작 1·2: 안전 정책 검증·차이·시험 정책 복원
 
@@ -62,4 +68,4 @@
 
 `npm install`, `node --test test/*.test.mjs`, `npm run decider:test`, `npm run detect:test`, `npm run build -- --local` 순으로 로컬 검증합니다. 최신 진단 변경의 전체 로컬 테스트는 97/97 통과했습니다. 이는 심판 통과 증거가 아닙니다. 서버 비밀 설정은 Vercel 환경변수에서만 유지합니다. `npm run bundle`은 커밋된 저장소 상태와 실제 공개 배포에 대해 수행하며 인증된 B 복원 미실행 항목을 그대로 남깁니다.
 
-1~9단계 인증·소유권·기기·재인증·자원 경로 통제는 그대로 유지합니다. `src/decider.mjs`는 `docs/DECIDER_REQUEST.md`의 공식 필드만 읽고 등록된 RULE_IDS만 반환합니다. `aleph.config.json`의 step은 10입니다.
+1~9단계 인증·소유권·기기·재인증·자원 경로 통제는 그대로 유지합니다. `src/decider.mjs`는 `docs/DECIDER_REQUEST.md`의 공식 필드만 읽고 등록된 RULE_IDS만 반환합니다. `aleph.config.json`의 step은 11입니다.

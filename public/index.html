@@ -3,6 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101a28">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icons/vault-192.png">
   <title>BYTE BACK | 내 자료실</title>
   <style>
     :root { color-scheme: dark; font-family: system-ui, sans-serif; }
@@ -20,10 +23,17 @@
 </head>
 <body>
   <main>
-    <div class="eyebrow">BYTE BACK · 3단계 로그인 확인</div>
+    <div class="eyebrow">BYTE BACK · 내 자료실 접속 앱</div>
     <h1>내 자료실</h1>
     <p>공개 파일에서 메모를 제거했습니다.</p>
     <div class="notice">로그인 후 메모를 볼 수 있습니다. 서버가 로그인 토큰을 확인합니다.</div>
+    <section aria-label="접속 앱 상태">
+      <h2>내 자료실 접속 앱</h2>
+      <p id="installation-status" role="status">웹 화면으로 접속 중입니다. 앱 설치는 기기 승인이 아닙니다.</p>
+      <button id="install-app" type="button" hidden>접속 앱 설치</button>
+      <p id="connection-status" role="status">오프라인에서는 보호 자료를 읽거나 수정할 수 없습니다.</p>
+      <p id="device-status" role="status">기기 승인: 확인되지 않음. 공식 서버 확인 흐름 연결 전입니다.</p>
+    </section>
     <section aria-label="계정 로그인" style="margin:24px 0;padding:20px;border:1px solid #51667c;border-radius:14px">
       <p id="auth-status" role="status" aria-live="polite">로그인 상태 확인 중…</p>
       <form id="login-form">
@@ -67,6 +77,7 @@
     <ul id="notes" aria-live="polite"><li>로그인하면 메모를 표시합니다.</li></ul>
   </main>
   <script type="module" src="/auth-ui.js"></script>
+  <script type="module" src="/app-ui.js"></script>
 
 </body>
 </html>

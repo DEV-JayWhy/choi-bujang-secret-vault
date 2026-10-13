@@ -1,6 +1,6 @@
 {
   "schema": "aleph.config.v1",
-  "step": 10,
+  "step": 11,
   "repoUrl": "https://github.com/DEV-JayWhy/choi-bujang-secret-vault",
   "publicAppUrl": "https://choi-bujang-secret-vault-xi.vercel.app",
   "sampleMarker": "SAMPLE_NOTE_1",
