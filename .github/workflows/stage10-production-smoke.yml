@@ -77,3 +77,30 @@ jobs:
           console.log(JSON.stringify({jwksStatus:response.status,keyCount:keys.length,hasES256:es256}));
           if(response.status!==200||!es256) throw new Error('JUDGE_JWKS_UNAVAILABLE');
           NODE
+
+      - name: Verify real judge-shaped but unsigned-by-judge token is rejected
+        env:
+          PUBLIC_URL: https://choi-bujang-secret-vault-xi.vercel.app
+        run: |
+          node --input-type=module <<'NODE'
+          import {generateKeyPairSync, randomUUID, sign} from 'node:crypto';
+          const {privateKey}=generateKeyPairSync('ec',{namedCurve:'prime256v1'});
+          const b64=x=>Buffer.from(JSON.stringify(x)).toString('base64url');
+          const now=Math.floor(Date.now()/1000);
+          const header=b64({alg:'ES256',typ:'JWT'});
+          const payload=b64({iss:'https://aleph-judge-production.up.railway.app/defense/judge',
+            aud:new URL(process.env.PUBLIC_URL).hostname,sub:randomUUID(),
+            aleph_run:randomUUID(),aleph_role:'judge',aleph_identity:'b',
+            iat:now,exp:now+300});
+          const data=header+'.'+payload;
+          const sig=sign('sha256',Buffer.from(data),{
+            key:privateKey,dsaEncoding:'ieee-p1363'}).toString('base64url');
+          const url=process.env.PUBLIC_URL+'/api/restore/11111111-1111-4111-8111-111111111111';
+          const res=await fetch(url,{headers:{authorization:'Bearer '+data+'.'+sig},
+            redirect:'error',signal:AbortSignal.timeout(12000)});
+          const body=await res.json().catch(()=>null);
+          const gate=res.headers.get('x-aleph-recovery-checkpoint');
+          console.log(JSON.stringify({status:res.status,checkpoint:gate,error:body?.error}));
+          if(res.status!==401||gate!=='auth_rejected'||body?.error!=='LOGIN_REQUIRED')
+            throw new Error('UNTRUSTED_JUDGE_SIGNATURE_NOT_REJECTED');
+          NODE
