@@ -508,3 +508,17 @@ zone_grant 규칙과 zone_denied 이유 코드는 공개 2026-09-26 r1 원고에
 이번 수정은 요청 Host, Origin, 쿼리 또는 임의 클라이언트 헤더를 절대 신뢰하지 않고, **Vercel 서버 환경에서 제공하는 `VERCEL_URL`의 검증된 `.vercel.app` 도메인만** 공개 Production 별칭에 추가합니다. 다른 사이트·변형 도메인·잘못된 역할/서명은 거부하고, issuer·JWKS·ES256·만료·A/B 주체·run UUID 검사는 유지합니다. 또한 심판이 서명한 주체와 실행 ID는 일반 UUID인지 확인하며 이전의 불필요한 **v4 버전 제한을 제거**했습니다. 임의 문자열 소유자를 받아들이지 않습니다.
 
 서명된 동일 A/B run의 Production 별칭/고정 배포 호스트 수용, 외부 audience 거부, 무효 토큰 거부, v7 UUID의 서명 검증을 별도 회귀 테스트에 추가했습니다. 이 테스트는 격리된 모의 키를 사용하므로 심판 실제 B 복원 성공과 별개입니다. 현재 단계 판정은 재제출 전까지 공식 **12/100점** 그대로입니다.
+
+### 10단계 2차 수정 — 공개 제출 주소와 정확한 복원 경로 (2026-10-13)
+
+**주소 차이와 최소 수정:** `aleph.config.json.publicAppUrl`은 이미 공개 Production `https://choi-bujang-secret-vault-xi.vercel.app`으로 올바릅니다. 그러나 `scripts/deployment-identity.mjs`가 `/aleph.json`의 `publicAppUrl`을 `VERCEL_URL`의 고정 배포 호스트로 덮어썼습니다. 1차 실측에서 공개 별칭의 복원 GET은 앱의 401/auth_missing이었고 고정 배포 호스트는 Vercel SSO 302였습니다. 이제 10단계 이상 배포 식별자는 검증된 설정의 공개 HTTPS 루트 주소를 유지하고, Vercel Git SHA는 계속 실제 배포 커밋을 기록합니다. Vercel SSO·JWT 검증·운영 정책 설정은 해제하거나 변경하지 않았습니다. 제출 시 공개 주소는 위 Production 별칭이며 고정 배포 주소를 제출 주소로 대체하지 않습니다.
+
+**판정 범위:** `src/decider.mjs`는 notes 서비스의 정확한 UUID `GET /api/restore/:id`와 `POST /api/restore/:id`만 기존 인증된 엔진 범위·등록 기기·이상 접속/step-up 규칙으로 판정합니다. collection·policy·demo 복원, query·fragment·추가 경로·잘못된 서비스/메서드는 허용하지 않습니다. 실 소유자·백업·봉인 검증은 기존 recovery API와 RPC가 수행하며 판정기의 allow가 타인 복원 권한을 뜻하지 않습니다. 기존 1~9단계의 경로·기기·공지 쓰기·자원·소유권·탐지 방어를 유지합니다.
+
+**복원 후 재조회:** 기존 정상 메모 GET와 금지 GET 재시험에 실제 공개 Production `GET /api/restore/<동일 UUID>` 미리보기를 추가했습니다. 복원 뒤에도 백업 verified, ID, 소유자, 내용 해시가 맞고 변경 항목이 비어 있어야 통과합니다. 결과에는 상태와 통과 여부만 담고 원문·JWT·타인 ID는 반환하지 않습니다. 외부 요청 실패, 소유자/해시 불일치, 남은 변경은 실패이며 `judgeFullReplay: not_run`은 유지합니다. 실제 심판의 전체 1~9단계 재공격이나 신원 회수 시험을 합성 함수 시험으로 대체했다고 주장하지 않습니다.
+
+**이번 실행 결과:** 새 복제본에서 npm install 성공, `node --test test/*.test.mjs` 93/93 통과. decider 연습 4개와 detect 연습 6개, fixture:7 정상 allow/이상 step_up, local build 성공. 두 push CI도 전체 테스트를 실행하도록 갱신했습니다. 이 수치는 로컬 모의 HTTP/SDK/DB 및 가상 판정 시험이며 실제 심판 B Production 복원 성공이 아닙니다.
+
+**DB 확인과 남은 시험:** 읽기 전용 실 DB 조회에서 메모/백업/봉인 각 5건, 사본 무결성·현재 본문 불일치 0건, 감사·관측 각 0건입니다. 기존 자료를 보존하는 롤백형 합성 B 변조·삭제·복원 시험을 요청했으나 Supabase 연결이 두 차례 `Invalid or expired requestState`로 실행 결과를 주지 않았습니다. 해당 SQL 시험은 성공으로 기록하지 않습니다. 현재 심판의 정확한 B 대상과 서명된 B 세션에 접근하지 못했으므로 그 대상의 공격 직전 백업 및 Production의 인증된 복원/정상 요청 전체 흐름은 미실행입니다. 기존 SQL·데이터·백업·감사를 수정하는 마이그레이션은 추가하지 않았습니다.
+
+**재현/검수 순서:** `npm install` → `node --test test/*.test.mjs` → `npm run decider:test` → `npm run detect:test` → `npm run fixture:7` → `npm run build -- --local`. main 반영 및 Production READY 이후 공개 별칭 `/aleph.json`의 SHA·공개 URL, 익명/위조 토큰 복원 GET을 확인하고 ignored `bundle-notes.json`에 실제 결과·미실행을 기록한 뒤 `npm run bundle`을 실행합니다. 생성 JSON은 HEAD SHA와 일치해야 합니다. 심판 재제출은 아직 하지 않으며 B 실측/남은 미실행 항목은 최종 검수에서 별도로 판단합니다.

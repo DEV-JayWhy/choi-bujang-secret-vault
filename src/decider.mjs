@@ -52,6 +52,13 @@ export function inspectNoteRoute(request) {
       || typeof request.route !== 'string' || typeof request.method !== 'string'
       || request.queryLength !== 0
       || request.querySha256 !== EMPTY_QUERY_SHA256) return false;
+  // Recovery uses the same engine-verified device/scope/step-up checks below.
+  // Only the submitted exact UUID route is allowed; ownership and sealed-backup
+  // verification remain mandatory in the authenticated recovery API.
+  const restore = /^\/api\/restore\/([^/?#]+)$/u.exec(request.path);
+  if (restore) return request.service === 'notes' && RESOURCE_UUID.test(restore[1])
+    && ['GET', 'POST'].includes(request.method)
+    && request.route === request.method + ' /api/restore/:id';
   const match = /^\/(notes|api\/notes|announcements|api\/announcements)\/([^/?#]+)$/u.exec(request.path);
   if (!match) return false;
   const prefix = match[1], id = match[2];

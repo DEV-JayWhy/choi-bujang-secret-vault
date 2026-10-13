@@ -5,16 +5,20 @@ import { createHash } from 'node:crypto';
 
 const self='11111111-1111-4111-8111-111111111111';
 const foreign='22222222-2222-4222-8222-222222222222';
-const token='Bearer offline-signed-judge-fixture';
+const token='Bearer mock';
 const contentHash=createHash('sha256').update('SECRET_B').digest('hex');
 
 test('after-restore checks actually invoke authorized GET, foreign denial and real fixture functions',async()=>{
   const invoked=[];
   const detail=async(req,res)=>{
     invoked.push({url:req.url,authenticated:!!req.headers.authorization});
+    const preview=req.url==='/api/restore/'+self;
     const code=!req.headers.authorization||req.headers.authorization==='Bearer invalid'?401:req.url==='/api/notes/export'?400
+      :preview?200
       :req.url==='/api/notes/'+self?200:404;
-    return res.status(code).json(code===200?{id:self,title:'not exposed',body:'SECRET_B'}:{error:'denied'});
+    return res.status(code).json(code===200?(preview?
+      {id:self,ownerId:self,verified:true,contentHash,changedFields:[]}:
+      {id:self,title:'not exposed',body:'SECRET_B'}):{error:'denied'});
   };
   const db={from(table){
     assert.equal(table,'a02_private_notes');
@@ -35,11 +39,11 @@ test('after-restore checks actually invoke authorized GET, foreign denial and re
   assert.equal(result.allExecutedChecksPassed,true);
   assert.equal(result.judgeFullReplay,'not_run');
   assert.deepEqual(result.checks.map(x=>x.name),[
-    'restored_owner_get','anonymous_get_denied','invalid_token_get_denied','unknown_route_denied',
+    'restored_owner_get','anonymous_get_denied','invalid_token_get_denied','unknown_route_denied','restored_backup_preview',
     'other_owner_get_denied','stage6_7_decision_fixtures','stage9_burst_fixture',
   ]);
-  assert.equal(result.checks.length,7);
-  assert.deepEqual(invoked.map(x=>x.authenticated),[true,false,true,true,true]);
+  assert.equal(result.checks.length,8);
+  assert.deepEqual(invoked.map(x=>x.authenticated),[true,false,true,true,true,true]);
   assert.equal(JSON.stringify(result).includes('SECRET_B'),false);
   assert.equal(JSON.stringify(result).includes(token),false);
   assert.equal(JSON.stringify(result).includes(foreign),false);
@@ -76,16 +80,20 @@ test('production HTTP transport binds destination, denies redirects, and verifie
     assert.equal(options.cache,'no-store');
     assert.ok(options.signal instanceof AbortSignal);
     const auth=options.headers.authorization;
+    const preview=url.pathname==='/api/restore/'+self;
     const code=!auth||auth==='Bearer invalid'?401:url.pathname==='/api/notes/export'?400
+      :preview?200
       :url.pathname==='/api/notes/'+self?200:404;
-    return new Response(JSON.stringify(code===200?{id:self,body:'SECRET_B'}:{error:'denied'}),
+    return new Response(JSON.stringify(code===200?(preview?
+      {id:self,ownerId:self,verified:true,contentHash,changedFields:[]}:
+      {id:self,body:'SECRET_B'}):{error:'denied'}),
       {status:code,headers:{'content-type':'application/json'}});
   };
   const db={from:()=>({select:()=>({neq:()=>({limit:async()=>({data:[{id:foreign}]})})})})};
   const result=await checkAfterRestore({noteId:self,ownerId:self,authorization:token,db,contentHash,fetcher});
   assert.equal(result.allExecutedChecksPassed,true);
   assert.equal(result.scope,'production_http_and_local_synthetic_fixtures');
-  assert.equal(calls.length,5);
+  assert.equal(calls.length,6);
   assert.equal(JSON.stringify(result).includes('SECRET_B'),false);
   assert.equal(JSON.stringify(result).includes(token),false);
   const mismatch=await checkAfterRestore({noteId:self,ownerId:self,authorization:token,db,
@@ -102,4 +110,24 @@ test('transport failures remain failed checks instead of fabricated HTTP results
   assert.equal(result.checks[0].httpStatus,null);
   assert.equal(result.checks[0].passed,false);
   assert.equal(result.judgeFullReplay,'not_run');
+});
+
+test('post-commit preview with wrong owner/hash or remaining changes cannot pass', async () => {
+  const db={from:()=>({select:()=>({neq:()=>({limit:async()=>({data:[{id:foreign}]})})})})};
+  for (const wrong of [{ownerId:foreign}, {contentHash:'0'.repeat(64)},
+    {changedFields:['content']}, {verified:false}]) {
+    const fetcher=async(url,options)=>{
+      const auth=options.headers.authorization;
+      const preview=url.pathname==='/api/restore/'+self;
+      const code=!auth||auth==='Bearer invalid'?401:url.pathname==='/api/notes/export'?400
+        :preview||url.pathname==='/api/notes/'+self?200:404;
+      const body=preview?{id:self,ownerId:self,verified:true,contentHash,changedFields:[],...wrong}
+        :{id:self,body:'SECRET_B'};
+      return new Response(JSON.stringify(code===200?body:{error:'denied'}),{status:code});
+    };
+    const result=await checkAfterRestore({noteId:self,ownerId:self,authorization:token,db,contentHash,fetcher});
+    assert.equal(result.checks.find(x=>x.name==='restored_backup_preview').passed,false);
+    assert.equal(result.allExecutedChecksPassed,false);
+    assert.equal(result.judgeFullReplay,'not_run');
+  }
 });

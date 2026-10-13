@@ -41,7 +41,7 @@ jobs:
       - name: Verify Stage 1-10 practice contracts and previous decisions
         run: |
           npm run detect:test
-          node --test test/detect-input.test.mjs test/detect-window.test.mjs test/attack-check-readonly.test.mjs test/recovery-api.test.mjs test/post-restore-retest.test.mjs test/stage10-submission-contract.test.mjs test/recovery-observation.test.mjs test/stage10-recovery-ui.test.mjs test/restore-readiness.test.mjs
+          node --test test/*.test.mjs
           node --check public/auth-ui.js
           npm run decider:test
           npm run fixture:7

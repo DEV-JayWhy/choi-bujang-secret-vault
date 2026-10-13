@@ -69,6 +69,16 @@ export async function checkAfterRestore({
     // Do not include own.body in the returned evidence.
   }
 
+  // Re-read the deployed preview route AFTER commit as well as the live note.
+  // This is a real HTTP check; never turn a transport/verification failure into
+  // a synthetic success or include private preview metadata in the evidence.
+  const backup = await probe('restored_backup_preview', '/api/restore/' + noteId, authorization, 200);
+  backup.check.passed = backup.check.passed && backup.res.body?.verified === true
+    && backup.res.body.id === noteId && backup.res.body.ownerId === ownerId
+    && backup.res.body.contentHash === contentHash
+    && Array.isArray(backup.res.body.changedFields) && backup.res.body.changedFields.length === 0;
+  checks.push(backup.check);
+
   try {
     const { data, error } = await db.from('a02_private_notes').select('id')
       .neq('owner_id', ownerId).limit(1);

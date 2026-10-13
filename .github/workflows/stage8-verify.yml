@@ -28,13 +28,7 @@ jobs:
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Judge A/B, API, decision engine regressions
         run: |
-          node --test test/judge-persona-isolation.test.mjs \
-            test/notes-ownership.test.mjs \
-            test/notes-cookie.test.mjs \
-            test/stage8-policy-regression.test.mjs \
-            test/stage8-routes.test.mjs \
-            test/decider-runtime.test.mjs \
-            test/stage6-7-regression.test.mjs
+          node --test test/*.test.mjs
       - name: Stage 9-10 detector, restore identity and backup policy regressions
         run: |
           npm run detect:test

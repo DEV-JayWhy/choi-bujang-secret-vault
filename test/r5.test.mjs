@@ -55,3 +55,15 @@ test('first attack check reads public data.json without credentials', async () =
     globalThis.fetch = originalFetch;
   }
 });
+
+test('stage 10 deployment identity keeps public Production origin and pinned Git SHA', () => {
+  const result = deploymentIdentity(env, { ...config, step: 10 });
+  assert.equal(result.publicAppUrl, config.publicAppUrl);
+  assert.equal(result.commit, env.VERCEL_GIT_COMMIT_SHA);
+  assert.notEqual(new URL(result.publicAppUrl).hostname, env.VERCEL_URL);
+  for (const publicAppUrl of ['https://outside.example', 'http://student-defense.vercel.app',
+    config.publicAppUrl+'/path', config.publicAppUrl+'?token=value',
+    'https://user:password@student-defense.vercel.app']) {
+    assert.throws(() => deploymentIdentity(env, { ...config, step:10, publicAppUrl }));
+  }
+});

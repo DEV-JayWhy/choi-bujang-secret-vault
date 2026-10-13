@@ -8,6 +8,19 @@ export function deploymentIdentity(env, config) {
   const repo = env.VERCEL_GIT_REPO_SLUG;
   const commit = env.VERCEL_GIT_COMMIT_SHA;
   const host = env.VERCEL_URL;
+  let publicAppUrl = `https://${host?.toLowerCase()}`;
+  if (config?.step >= 10) {
+    // A pinned deployment hostname can be behind Vercel SSO. Keep its SHA
+    // provenance, but publish the configured publicly reachable app origin.
+    let app;
+    try { app = new URL(config.publicAppUrl); } catch {
+      throw new Error('공개 Production 주소를 확인하세요.');
+    }
+    if (app.protocol !== 'https:' || !HOST.test(app.hostname)
+        || app.username || app.password || app.port || app.pathname !== '/'
+        || app.search || app.hash) throw new Error('공개 Production 주소를 확인하세요.');
+    publicAppUrl = app.origin;
+  }
   if (env.VERCEL_GIT_PROVIDER !== 'github' || !OWNER.test(owner || '')
       || !REPO.test(repo || '') || repo === '.' || repo === '..'
       || repo.toLowerCase().endsWith('.git') || !SHA.test(commit || '')
@@ -23,7 +36,7 @@ export function deploymentIdentity(env, config) {
     step: config.step,
     repoUrl: `https://github.com/${owner.toLowerCase()}/${repo.toLowerCase()}`,
     commit: commit.toLowerCase(),
-    publicAppUrl: `https://${host.toLowerCase()}`,
+    publicAppUrl,
     judgeIssuer: config.judgeIssuer,
     sampleMarker: config.sampleMarker,
   };
