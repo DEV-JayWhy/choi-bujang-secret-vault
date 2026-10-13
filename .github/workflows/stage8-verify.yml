@@ -1,4 +1,4 @@
-name: Stage 6-9 Security Regression
+name: Stage 6-10 Security Regression
 
 on:
   push:
@@ -34,10 +34,10 @@ jobs:
             test/stage8-routes.test.mjs \
             test/decider-runtime.test.mjs \
             test/stage6-7-regression.test.mjs
-      - name: Stage 9 input privacy, burst thresholds and read-only self-check
+      - name: Stage 9-10 detector, restore identity and backup policy regressions
         run: |
           npm run detect:test
-          node --test test/detect-input.test.mjs test/detect-window.test.mjs test/attack-check-readonly.test.mjs
+          node --test test/detect-input.test.mjs test/detect-window.test.mjs test/attack-check-readonly.test.mjs test/recovery-api.test.mjs
       - name: Existing decision fixtures
         run: |
           npm run decider:test
