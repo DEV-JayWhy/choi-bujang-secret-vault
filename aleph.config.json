@@ -94,6 +94,18 @@
       "method": "POST",
       "pathPattern": "/api/restore/:id",
       "zone": "my-notes"
+    },
+    {
+      "service": "auth",
+      "method": "GET",
+      "pathPattern": "/api/device/status",
+      "zone": "authentication"
+    },
+    {
+      "service": "auth",
+      "method": "POST",
+      "pathPattern": "/api/device/request",
+      "zone": "authentication"
     }
   ],
   "originalApiUrl": "https://yugdsswjndlajydiwvwc.supabase.co/rest/v1/a02_private_notes",

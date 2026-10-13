@@ -9,6 +9,11 @@ const password = document.querySelector('#password');
 const list = document.querySelector('#notes');
 let generation = 0;
 let currentSession = null;
+let currentDeviceApproved = false;
+const protectedVault = document.querySelector('#protected-vault');
+const deviceStatus = document.querySelector('#device-status');
+const deviceRequest = document.querySelector('#device-request');
+const deviceRefresh = document.querySelector('#device-refresh');
 let editingId = null;
 const editor = document.querySelector('#note-editor');
 const noteForm = document.querySelector('#note-form');
@@ -64,7 +69,7 @@ restoreForm.addEventListener('submit', async event => {
   resetRestorePreview();
   restoreMessage.textContent = '';
   const id = restoreId.value.trim().toLowerCase();
-  if (!restoreUuid.test(id) || !currentSession?.user) {
+  if (!restoreUuid.test(id) || !currentSession?.user || !currentDeviceApproved) {
     restoreMessage.textContent = '로그인 후 메모 UUID를 확인해 주세요.';
     return;
   }
@@ -87,7 +92,7 @@ restoreForm.addEventListener('submit', async event => {
 });
 restoreExecute.addEventListener('click', async () => {
   const preview = restoredPreview;
-  if (!preview || !restoreConfirm.checked || !currentSession?.user) return;
+  if (!preview || !restoreConfirm.checked || !currentSession?.user || !currentDeviceApproved) return;
   const user = currentSession.user.id;
   const current = generation;
   restoreExecute.disabled = true;
@@ -122,6 +127,9 @@ function resetEditor() {
   document.querySelector('#editor-heading').textContent = '메모 추가'; cancelNote.hidden = true;
 }
 async function notesRequest(path, method = 'GET', body) {
+  if (!currentDeviceApproved || !currentSession?.user || !navigator.onLine) {
+    throw new Error('온라인 상태에서 서버의 기기 승인을 먼저 확인해 주세요.');
+  }
   let response = await fetch(path, {
     method, cache: 'no-store', credentials: 'same-origin',
     headers: body ? { 'Content-Type': 'application/json' } : {},
@@ -131,9 +139,8 @@ async function notesRequest(path, method = 'GET', body) {
     refreshPending ??= authRequest('session').finally(() => { refreshPending = null; });
     const session = await refreshPending;
     if (!session.user) { render(null); throw new Error('다시 로그인해 주세요.'); }
-    response = await fetch(path, { method, cache: 'no-store', credentials: 'same-origin',
-      headers: body ? { 'Content-Type': 'application/json' } : {},
-      ...(body ? { body: JSON.stringify(body) } : {}) });
+    render(session);
+    throw new Error('로그인 세션을 갱신했습니다. 서버의 기기 승인 결과를 다시 확인해 주세요.');
   }
   if (response.status === 404) throw new Error('메모가 없거나 삭제되었습니다.');
   if (response.status === 409) throw new Error('같은 ID의 메모가 이미 있습니다.');
@@ -143,7 +150,7 @@ async function notesRequest(path, method = 'GET', body) {
 async function loadNotes(session) {
   const current = ++generation;
   list.replaceChildren();
-  if (!session?.user) { list.textContent = '로그인하면 메모를 표시합니다.'; return; }
+  if (!session?.user || !currentDeviceApproved) { list.textContent = '서버의 기기 승인 확인 후 메모를 표시합니다.'; return; }
   list.textContent = '메모를 불러오는 중입니다.';
   try {
     const data = await notesRequest('/api/notes');
@@ -202,16 +209,61 @@ cancelNote.addEventListener('click', resetEditor);
 function render(session) {
   const changedUser = currentSession?.user?.id !== session?.user?.id;
   currentSession = session;
+  currentDeviceApproved = false;
+  protectedVault.hidden = true;
   const signedIn = Boolean(session?.user);
-  recoveryPanel.hidden = !signedIn;
+  recoveryPanel.hidden = true;
   if (!signedIn || changedUser) resetRecoveryPanel();
   status.textContent = signedIn ? `로그인됨: ${session.user.email ?? '사용자'}` : '로그아웃 상태';
-  form.hidden = signedIn; logout.hidden = !signedIn; editor.hidden = !signedIn; password.value = '';
+  form.hidden = signedIn; logout.hidden = !signedIn; editor.hidden = true; password.value = '';
+  deviceRequest.disabled = !signedIn; deviceRefresh.disabled = !signedIn;
   if (!signedIn || changedUser) { resetEditor(); noteMessage.textContent = ''; }
   ++generation; list.replaceChildren();
-  if (!signedIn) list.textContent = '로그인하면 메모를 표시합니다.';
-  setTimeout(() => { if (currentSession === session) void loadNotes(session); }, 0);
+  deviceStatus.textContent = signedIn ? '기기 승인: 서버에 확인 중입니다.' : '기기 승인: 로그인 후 서버에 확인합니다. 승인 전에는 보호 자료가 없습니다.';
+  if (signedIn) void checkDevice('status');
 }
+async function checkDevice(action) {
+  const owner = currentSession?.user?.id;
+  if (!owner) return;
+  // Clear old contents synchronously, including when a later recheck fails.
+  const current = ++generation;
+  currentDeviceApproved = false; protectedVault.hidden = true;
+  editor.hidden = true; recoveryPanel.hidden = true;
+  list.replaceChildren(); resetEditor(); resetRecoveryPanel(); noteMessage.textContent = '';
+  deviceRequest.disabled = true; deviceRefresh.disabled = true;
+  deviceStatus.textContent = action === 'request' ? '기기 승인 요청을 서버에 보내는 중입니다.' : '서버의 기기 승인 결과를 확인하는 중입니다.';
+  try {
+    if (!navigator.onLine) throw new Error('오프라인에서는 기기 승인을 확인할 수 없습니다.');
+    const response = await fetch(`/api/device/${action}`, {
+      method: action === 'request' ? 'POST' : 'GET',
+      cache: 'no-store', credentials: 'same-origin', headers: { Accept: 'application/json' },
+    });
+    const result = await response.json();
+    if (current !== generation || currentSession?.user?.id !== owner) return;
+    if (!response.ok) throw new Error('서버에서 기기 승인을 확인하지 못했습니다. 보호 자료는 닫혀 있습니다.');
+    // Installation and request events never set this value. Only server status does.
+    currentDeviceApproved = response.status === 200 && result.approved === true && result.state === 'approved';
+    protectedVault.hidden = !currentDeviceApproved;
+    editor.hidden = !currentDeviceApproved; recoveryPanel.hidden = !currentDeviceApproved;
+    deviceStatus.textContent = currentDeviceApproved
+      ? '기기 승인: 서버가 이 로그인 사용자와 기기의 등록 승인을 확인했습니다.'
+      : result.state === 'pending'
+        ? `기기 승인: 요청 대기 중입니다. 요청 번호 ${result.requestId ?? '-'} · 승인 전에는 보호 자료를 표시하지 않습니다.`
+        : '기기 승인: 등록되지 않았습니다. 승인을 요청한 후 서버 결과를 다시 확인해 주세요.';
+    if (currentDeviceApproved) await loadNotes(currentSession);
+  } catch (error) {
+    if (current === generation) deviceStatus.textContent = error.message;
+  } finally {
+    if (currentSession?.user?.id === owner) { deviceRequest.disabled = false; deviceRefresh.disabled = false; }
+  }
+}
+deviceRequest.addEventListener('click', () => void checkDevice('request'));
+deviceRefresh.addEventListener('click', () => void checkDevice('status'));
+window.addEventListener('offline', () => {
+  currentDeviceApproved = false; ++generation; protectedVault.hidden = true;
+  list.replaceChildren(); resetEditor(); resetRecoveryPanel();
+  deviceStatus.textContent = '오프라인입니다. 보호 자료를 닫았습니다. 연결 후 서버 승인 결과를 다시 확인해 주세요.';
+});
 function reason(error) {
   const reasons = {
     invalid_credentials: '이메일 또는 비밀번호가 올바르지 않습니다.',

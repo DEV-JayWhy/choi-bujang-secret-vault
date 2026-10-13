@@ -162,5 +162,27 @@ export async function runAttackChecks(config) {
       },
     );
   }
+  if (config.step >= 11) {
+    // Keep the 20-item submission limit; replace redundant historical unrun
+    // entries with current stage read-only probes. Never claim approval here.
+    for (const id of ['database_rls_privileges', 'stage9_stolen_session_retry', 'stage9_cross_resource_retry']) {
+      const index = results.findIndex(item => item.attackId === id);
+      if (index >= 0) results.splice(index, 1);
+    }
+    for (const [attackId, path, expected] of [
+      ['stage11_manifest', '/manifest.webmanifest', '앱 이름·아이콘·시작 주소가 있는 manifest HTTP 200'],
+      ['stage11_unapproved_device', '/api/device/status', '로그인 없는 기기 조회는 401, approved는 true가 아님'],
+    ]) {
+      try {
+        const response = await fetch(new URL(path, app), { redirect: 'error', signal: AbortSignal.timeout(10000) });
+        let body; try { body = await response.json(); } catch { body = null; }
+        const valid = attackId === 'stage11_manifest'
+          ? response.status === 200 && typeof body?.name === 'string' && body.start_url === '/' && Array.isArray(body.icons)
+          : response.status === 401 && body?.approved === false;
+        results.push({ attackId, expected, observed: `HTTP ${response.status}; 기대 조건 ${valid ? '일치' : '불일치'}` });
+      } catch { results.push({ attackId, expected, observed: '미확인: HTTP 요청 실패 또는 시간 초과' }); }
+    }
+    results.push({ attackId: 'stage11_approved_browser', expected: '서버가 승인한 기기에서 기존 자료실 조회·수정·복원 정상', observed: '미실행: 실제 승인 완료 사용자 브라우저의 자료실 실행은 별도 검증 필요; 로컬 승인 응답 모의 시험과 구분' });
+  }
   return results;
 }

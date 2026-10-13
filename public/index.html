@@ -32,7 +32,10 @@
       <p id="installation-status" role="status">웹 화면으로 접속 중입니다. 앱 설치는 기기 승인이 아닙니다.</p>
       <button id="install-app" type="button" hidden>접속 앱 설치</button>
       <p id="connection-status" role="status">오프라인에서는 보호 자료를 읽거나 수정할 수 없습니다.</p>
-      <p id="device-status" role="status">기기 승인: 확인되지 않음. 공식 서버 확인 흐름 연결 전입니다.</p>
+      <p id="device-status" role="status" aria-live="polite">기기 승인: 서버 확인 전입니다. 승인 전에는 보호 자료를 표시하지 않습니다.</p>
+      <button id="device-request" type="button" disabled>기기 승인 요청</button>
+      <button id="device-refresh" type="button" disabled>서버 승인 결과 확인</button>
+      <p>요청은 대기 상태로만 저장됩니다. 운영자가 별도로 승인한 뒤 서버 확인이 성공해야 자료실이 열립니다.</p>
     </section>
     <section aria-label="계정 로그인" style="margin:24px 0;padding:20px;border:1px solid #51667c;border-radius:14px">
       <p id="auth-status" role="status" aria-live="polite">로그인 상태 확인 중…</p>
@@ -46,6 +49,7 @@
       <button id="logout-button" type="button" hidden>로그아웃</button>
       <p id="auth-message" role="alert" aria-live="polite"></p>
     </section>
+    <section id="protected-vault" hidden aria-label="서버 승인 후 자료실">
     <section id="note-editor" hidden aria-label="메모 작성">
       <h2 id="editor-heading">메모 추가</h2>
       <form id="note-form">
@@ -75,6 +79,7 @@
       <p>이 화면의 복구 재시험은 공식 심판의 모든 공격 재전송과 별개입니다.</p>
     </section>
     <ul id="notes" aria-live="polite"><li>로그인하면 메모를 표시합니다.</li></ul>
+    </section>
   </main>
   <script type="module" src="/auth-ui.js"></script>
   <script type="module" src="/app-ui.js"></script>
