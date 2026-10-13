@@ -90,6 +90,7 @@ test('A/B own CRUD, cross-owner denial, owner spoof denial and unauthenticated d
     };
     for (const [handler, method] of [[collection, 'GET'], [collection, 'POST'], [detail, 'GET'], [detail, 'PUT'], [detail, 'DELETE']]) {
       const res = await call(handler, method, {}, userId, {}); assert.equal(res.code, 401); assert.ok(!res.body.notes);
+      assert.equal(res.headers['x-aleph-resource-id'], undefined);
     }
     assert.equal((await call(collection, 'GET', undefined, undefined, { authorization: 'Bearer invalid' })).code, 401);
     assert.equal(writes, 0);
@@ -102,27 +103,34 @@ test('A/B own CRUD, cross-owner denial, owner spoof denial and unauthenticated d
     const added = await call(collection, 'POST', { title: 'test', body: 'test body', role: 'admin' });
     assert.equal(added.code, 201); const id = added.body.id; assert.match(id, /^[0-9a-f-]{36}$/);
     let res = await call(detail, 'GET', undefined, id); assert.deepEqual(res.body, { id, title: 'test', body: 'test body' });
+    assert.equal(res.headers['x-aleph-resource-id'], 'private_note:' + id);
     // Even if an upstream query returns another owner's row, never disclose it.
     forceForeignGetRow = true;
     res = await call(detail, 'GET', undefined, id);
     assert.equal(res.code, 404);
     assert.deepEqual(res.body, { error: 'NOTE_NOT_FOUND' });
+    assert.equal(res.headers['x-aleph-resource-id'], undefined);
     forceForeignGetRow = false;
     forceWrongGetId = true;
     res = await call(detail, 'GET', undefined, id);
     assert.equal(res.code, 404);
     assert.deepEqual(res.body, { error: 'NOTE_NOT_FOUND' });
+    assert.equal(res.headers['x-aleph-resource-id'], undefined);
     forceWrongGetId = false;
     forceForeignListRow = true;
     res = await call(collection, 'GET');
     assert.equal(res.code, 502);
     assert.deepEqual(res.body, { error: 'NOTES_UNAVAILABLE' });
+    assert.equal(res.headers['x-aleph-resource-id'], undefined);
     forceForeignListRow = false;
     res = await call(collection, 'GET'); assert.equal(res.body.length, 1);
+    assert.equal(res.headers['x-aleph-resource-id'], 'private_note:collection');
     res = await call(detail, 'PUT', { title: 'changed', body: 'changed body' }, id);
     assert.equal(res.code, 200); assert.equal(res.body.body, 'changed body'); assert.equal(rows.get(id).owner_id, userId);
     for (const method of ['GET', 'PUT', 'DELETE']) {
-      assert.equal((await call(detail, method, method === 'PUT' ? {title:'intruder',body:''} : undefined, id, bHeaders)).code, 404);
+      const denied = await call(detail, method, method === 'PUT' ? {title:'intruder',body:''} : undefined, id, bHeaders);
+      assert.equal(denied.code, 404);
+      assert.equal(denied.headers['x-aleph-resource-id'], undefined);
     }
     assert.equal(rows.get(id).owner_id, userId);
     assert.equal(rows.get(id).title, 'changed');
