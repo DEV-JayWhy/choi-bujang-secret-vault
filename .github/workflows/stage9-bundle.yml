@@ -40,7 +40,7 @@ jobs:
       - name: Verify Stage 1-10 practice contracts and previous decisions
         run: |
           npm run detect:test
-          node --test test/detect-input.test.mjs test/detect-window.test.mjs test/attack-check-readonly.test.mjs test/recovery-api.test.mjs
+          node --test test/detect-input.test.mjs test/detect-window.test.mjs test/attack-check-readonly.test.mjs test/recovery-api.test.mjs test/post-restore-retest.test.mjs
           npm run decider:test
           npm run fixture:7
           npm run build -- --local
@@ -77,7 +77,7 @@ jobs:
           assert.ok(data.policyRules.includes('step_up_required'));
           assert.ok(data.policyRules.includes('resource_zone'));
           assert.equal(data.attackAttempts.length, 20);
-          assert.equal(data.restoreRoute, '/api/restore');
+          assert.equal(data.restoreRoute, '/api/restore/:id');
           assert.match(data.attackAttempts.find(x => x.attackId === 'restore_route_requires_login').observed, /HTTP 401; 메모 자료 감지되지 않음; 기대 조건 일치/u);
           for (const id of ['stage10_backup_revalidation', 'stage10_restoration_full_replay']) {
             assert.match(data.attackAttempts.find(x => x.attackId === id).observed, /^미실행/u);
@@ -99,7 +99,7 @@ jobs:
           JS
       - name: Print generated submission JSON
         run: cat artifacts/submission.json
-      - name: Upload stage 9 submission artifact
+      - name: Upload stage 10 submission artifact
         uses: actions/upload-artifact@v4
         with:
           name: aleph-stage10-submission
