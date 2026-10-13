@@ -1,3 +1,4 @@
+// Stage 10 final checkpoint: run actual signed GET checks only after a verified restore.
 import { notesHandler } from './notes-handler.mjs';
 import { decide, RULE_IDS } from './decider.mjs';
 import { detect } from './detect.mjs';

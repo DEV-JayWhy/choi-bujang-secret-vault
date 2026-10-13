@@ -1,4 +1,5 @@
 {
+  "schema": "aleph.config.v1",
   "step": 10,
   "repoUrl": "https://github.com/DEV-JayWhy/choi-bujang-secret-vault",
   "publicAppUrl": "https://choi-bujang-secret-vault-xi.vercel.app",
@@ -96,6 +97,5 @@
     }
   ],
   "originalApiUrl": "https://yugdsswjndlajydiwvwc.supabase.co/rest/v1/a02_private_notes",
-  "restoreRoute": "/api/restore/:id",
-  "schema": "aleph.config.v1"
+  "restoreRoute": "/api/restore/:id"
 }

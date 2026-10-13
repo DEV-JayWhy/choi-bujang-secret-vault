@@ -1,3 +1,4 @@
+# Stage 10 checkpoint: publish a real clean-HEAD submission JSON with production GET evidence.
 name: Stage 10 Submission Bundle
 
 on:

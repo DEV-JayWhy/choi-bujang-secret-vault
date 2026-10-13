@@ -1,3 +1,4 @@
+-- Stage 10 final checkpoint: immutable snapshot seal + compare-and-restore version contract.
 -- Stage 10 backup integrity upgrade; applied to Supabase on 2026-10-13.
 -- SQL does not contain user notes, credentials, or backup contents.
 

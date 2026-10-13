@@ -1,3 +1,4 @@
+# Stage 10 checkpoint: signed restore, route/zone contract, privacy audit, UI checks.
 name: Stage 6-10 Security Regression
 
 on:

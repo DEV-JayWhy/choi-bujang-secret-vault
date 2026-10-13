@@ -1,3 +1,4 @@
+// Stage 10 final checkpoint: production HTTP checks include the dynamic recovery login gate.
 import { detect } from './detect.mjs';
 
 // The student changes this check as each stage adds an attack to the same app.

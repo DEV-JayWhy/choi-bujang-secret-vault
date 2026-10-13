@@ -1,3 +1,4 @@
+// Stage 10 final checkpoint: require verified preview plus explicit checked approval before POST.
 const status = document.querySelector('#auth-status');
 const message = document.querySelector('#auth-message');
 const form = document.querySelector('#login-form');

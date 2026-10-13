@@ -1,3 +1,4 @@
+// Stage 10 final checkpoint: anonymous fixed-code milestones, never tokens or note identifiers.
 // Minimal persistent diagnostics after a cryptographically verified login.
 // No note ID, owner ID, token, body, hash, IP, email or unbounded text.
 const CHECKPOINTS = new Set(['auth_verified','backup_verified','backup_rejected',

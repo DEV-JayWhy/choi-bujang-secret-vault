@@ -1,3 +1,4 @@
+// Stage 10 final checkpoint: authenticated exact-ID preview, sealed restore, post-restore checks.
 import { createClient } from '@supabase/supabase-js';
 import { readFileSync } from 'node:fs';
 import { cookieToken, sameOrigin } from './server-auth.mjs';

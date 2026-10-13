@@ -87,8 +87,11 @@ test('signed B may preview and restore one matching sealed backup via path or bo
   } };
   let as = student;
   const checksAfter = [];
+  const observations = [];
   const handler = createRecoveryHandler(false, { verify: async () => as, makeClient: () => client,
-    observe: async () => true,
+    observe: async (_db, kind, checkpoint, reason) => {
+      observations.push({ kind, checkpoint, reason }); return true;
+    },
     retest: async input => {
       checksAfter.push({ noteId: input.noteId, ownerId: input.ownerId });
       return { executedAfterRestore: true, checks: [
@@ -108,6 +111,10 @@ test('signed B may preview and restore one matching sealed backup via path or bo
   assert.equal(result.statusCode,200,'judge may POST the UUID path with no body');
   assert.equal(result.body.restored,true);
   assert.equal(state,'restored');
+  assert.deepEqual(observations.slice(-4).map(x => x.checkpoint),
+    ['auth_verified', 'backup_verified', 'restore_committed', 'retest_passed']);
+  assert.ok(observations.every(x => x.kind === 'student'));
+
   assert.equal(result.body.postRestoreRetest.executedAfterRestore, true);
   assert.deepEqual(checksAfter.at(-1), { noteId, ownerId: ownId });
   assert.equal(calls.at(-2).fn,'a10_preview_verified_note');
