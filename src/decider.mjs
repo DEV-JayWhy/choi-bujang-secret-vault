@@ -48,7 +48,12 @@ export function inspectNoteRoute(request) {
   if (request?.service !== 'notes') return false;
   const { method, route, path } = request;
   if (typeof path !== 'string' || typeof route !== 'string' || typeof method !== 'string') return false;
-  if (path === '/notes') return COLLECTION_METHODS.has(method) && route === `${method} /notes`;
+  if (path === '/notes') {
+    if (!COLLECTION_METHODS.has(method) || route !== `${method} /notes`) return false;
+    // The engine provides only the query length and digest, not verified filter contents.
+    // An unscoped collection request with query parameters cannot be authorized safely.
+    return method !== 'GET' || request.queryLength === 0 || request.queryLength === undefined;
+  }
   if (!ITEM_METHODS.has(method) || route !== `${method} /notes/:id`) return false;
   // One literal segment, no query, fragment, encoded separators, dot segments or reserved feature names.
   const match = /^\/notes\/([A-Za-z0-9._~-]+)$/u.exec(path);
