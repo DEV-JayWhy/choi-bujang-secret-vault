@@ -138,15 +138,24 @@ export async function decide(request) {
       || request.service === 'materials'
       || /^\/(?:announcements|instructor|materials)(?:\/|$)/u.test(request.path ?? ''));
   const routeAllowed = !protectedWrite && inspectNoteRoute(request);
-  const decision = !registered || !routeAllowed ? 'deny' : needsConfirmation ? 'step_up' : 'allow';
+  // UUID syntax alone is not an ownership grant. Require a fresh engine
+  // verification for individual UUID reads, while keeping the documented
+  // /notes/demo fixture and existing API owner checks unchanged.
+  const uuidRead = request.method === 'GET' && request.service === 'notes'
+    && request.route === 'GET /notes/:id'
+    && typeof request.path === 'string'
+    && /^\\/notes\\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(request.path);
+  const verifyUuidRead = uuidRead && !confirmed;
+  const decision = !registered || !routeAllowed ? 'deny'
+    : needsConfirmation || verifyUuidRead ? 'step_up' : 'allow';
   return {
     schema: 'aleph.decision.v1',
     requestId: request.requestId,
     decision,
     reasonCode: !registered ? 'device_not_registered'
-      : !routeAllowed ? 'zone_denied' : needsConfirmation ? 'step_up_required' : 'approved',
+      : !routeAllowed ? 'zone_denied' : needsConfirmation || verifyUuidRead ? 'step_up_required' : 'approved',
     ruleIds: !registered ? ['device_registered']
       : !routeAllowed ? ['zone_grant']
-        : needsConfirmation ? [...RULE_IDS] : ['device_registered', 'zone_grant'],
+        : needsConfirmation || verifyUuidRead ? [...RULE_IDS] : ['device_registered', 'zone_grant'],
   };
 }
