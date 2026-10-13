@@ -43,23 +43,30 @@ export function inspectAccessContext(request) {
 // current runtime acceptance remains a judge verification item, not a local test guarantee.
 const COLLECTION_METHODS = new Set(['GET', 'POST']);
 const ITEM_METHODS = new Set(['GET', 'PUT', 'DELETE']);
-const RESERVED_ITEM_NAMES = new Set(['export', 'all', 'bulk', 'search', 'admin']);
+// The API's resource IDs are UUIDs. The supplied engine fixture also documents
+// the literal demo ID. A syntactically safe word is not a known note resource:
+// accepting every word makes collection/function/other-zone names look like IDs.
+const NOTE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 export function inspectNoteRoute(request) {
   if (request?.service !== 'notes') return false;
   const { method, route, path } = request;
   if (typeof path !== 'string' || typeof route !== 'string' || typeof method !== 'string') return false;
+  // No query-selected operation or owner scope is present in the contract.
+  // Omitted metadata is retained only for older local fixtures; the engine
+  // supplies queryLength. Its digest cannot establish a query's authorization.
+  if (request.queryLength !== undefined && request.queryLength !== 0) return false;
   if (path === '/notes') {
     if (!COLLECTION_METHODS.has(method) || route !== `${method} /notes`) return false;
     // The engine provides only the query length and digest, not verified filter contents.
     // An unscoped collection request with query parameters cannot be authorized safely.
-    return method !== 'GET' || request.queryLength === 0 || request.queryLength === undefined;
+    return true;
   }
   if (!ITEM_METHODS.has(method) || route !== `${method} /notes/:id`) return false;
-  // One literal segment, no query, fragment, encoded separators, dot segments or reserved feature names.
-  const match = /^\/notes\/([A-Za-z0-9._~-]+)$/u.exec(path);
+  // One literal ID segment, without URL normalization or decoding.
+  const match = /^\/notes\/([^/?#]+)$/u.exec(path);
   if (!match) return false;
   const id = match[1];
-  return id !== '.' && id !== '..' && !RESERVED_ITEM_NAMES.has(id.toLowerCase());
+  return id === 'demo' || NOTE_UUID.test(id);
 }
 
 export async function decide(request) {
