@@ -88,6 +88,7 @@ test('signed B may preview and restore one matching sealed backup via path or bo
   let as = student;
   const checksAfter = [];
   const handler = createRecoveryHandler(false, { verify: async () => as, makeClient: () => client,
+    observe: async () => true,
     retest: async input => {
       checksAfter.push({ noteId: input.noteId, ownerId: input.ownerId });
       return { executedAfterRestore: true, checks: [
@@ -143,6 +144,7 @@ test('missing JWT, invalid selector and cookie-origin mismatch are rejected befo
   let called = 0;
   const handler = createRecoveryHandler(false, {
     verify: async () => student,
+    observe: async () => true,
     makeClient: () => ({ rpc: async () => { called++; return {}; } }),
   });
   let res = await run(handler, { method:'POST',authorization:null,body:{id:noteId} });
