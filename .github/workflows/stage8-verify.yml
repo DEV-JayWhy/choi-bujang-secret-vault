@@ -1,0 +1,40 @@
+name: Stage 8 Security Regression
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'api/**'
+      - 'test/**'
+      - '.github/workflows/stage8-verify.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  security-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Judge A/B, API, decision engine regressions
+        run: |
+          node --test test/judge-persona-isolation.test.mjs \
+            test/notes-ownership.test.mjs \
+            test/notes-cookie.test.mjs \
+            test/stage8-policy-regression.test.mjs \
+            test/stage8-routes.test.mjs \
+            test/decider-runtime.test.mjs \
+            test/stage6-7-regression.test.mjs
+      - name: Existing decision fixtures
+        run: |
+          npm run decider:test
+          npm run fixture:7
+      - name: Local production build check
+        run: npm run build -- --local
