@@ -1,0 +1,39 @@
+name: Inspect Public Judge Frontend
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/inspect-public-judge.yml']
+jobs:
+  public-assets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Examine publicly served HTML and JavaScript for Stage 10 contracts
+        run: |
+          node --input-type=module <<'NODE'
+          const origin='https://aleph-omega.vercel.app';
+          const response=await fetch(origin+'/cortex',{redirect:'follow',signal:AbortSignal.timeout(12000)});
+          const html=await response.text();
+          console.log('PAGE',JSON.stringify({status:response.status,url:response.url,length:html.length}));
+          if(response.status!==200)process.exit(1);
+          const paths=[...new Set([...html.matchAll(/(?:src|href)="([^"]+\\.js(?:\\?[^"]*)?)"/g)].map(x=>x[1]))].slice(0,35);
+          console.log('PUBLIC_JS_ASSETS',paths.length);
+          const patterns=[/S10_BACKUP_UNVERIFIED/g,/S10_RESTORE_MISMATCH/g,/S10_RETEST_MISSING/g,/backupVersion/g,/restoreRoute/g,/judgeIssuer/g,/\/api\/restore/g,/changedFields/g,/postRestoreRetest/g];
+          for(const path of paths){
+            try{
+              const r=await fetch(new URL(path,origin),{signal:AbortSignal.timeout(10000)});
+              if(!r.ok)continue;
+              const source=await r.text();
+              const hits=[];
+              for(const re of patterns)if(re.test(source))hits.push(re.source);
+              if(hits.length){
+                console.log('ASSET_MATCH',JSON.stringify({path,length:source.length,hits}));
+                for(const re of patterns){
+                  re.lastIndex=0;const match=re.exec(source);
+                  if(match)console.log('PUBLIC_CONTEXT',JSON.stringify({path,term:re.source,excerpt:source.slice(Math.max(0,match.index-120),match.index+180).replace(/[\\r\\n]/g,' ')}));
+                }
+              }
+            }catch(e){console.log('ASSET_UNAVAILABLE',path,String(e).slice(0,100))}
+          }
+          NODE
