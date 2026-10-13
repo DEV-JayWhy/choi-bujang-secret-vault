@@ -391,3 +391,53 @@ zone_grant 규칙과 zone_denied 이유 코드는 공개 2026-09-26 r1 원고에
 - **저장점/번들:** 9단계 코드를 `main`에 반영하고 배포가 최신 HEAD의 `READY`인지 확인한 뒤 `npm run bundle`을 실행합니다. 로컬 제출 묶음 파일 `bundle-notes.json` 및 `artifacts/submission.json`은 Git에 올리지 않으며, 공식 심판 재제출은 학생이 수행합니다.
 
 **이전 단계의 미해결 심판 문제를 구분합니다.** 8단계 공식 최근 확인 점수는 `96fc04b...`에서 **48/100, S08_OTHER_ZONE_ALLOWED**였습니다. 이후 판정기 조정 `92ed2a2...`의 공식 심판 결과는 이 저장소에 확인된 기록이 없습니다. 9단계 제출이 8단계 문제 해결을 소급 증명하지 않습니다.
+
+## 10단계 저장점 — 검증된 사본에서 지정 자원 복원 (2026-10-13)
+
+**현재 코드:** `aleph.config.json.step = 10`. `restoreRoute = "/api/restore"`. 기존 `judgeIssuer`, `identityProvider`, 원본 API, 1~9단계 로그인·메모 CRUD·기기·추가 인증·자원 구역 정책·조회 폭주 탐지 함수는 보존합니다. GitHub 공개 저장소에는 비밀값/메모 본문을 넣지 않습니다.
+
+### 제작 1 — 정책 백업 무결성 및 차이 미리보기
+
+- 실제 Supabase `ALEPH_Defense_02`의 기존 **메모 5건/소유자 2명**과 운영 RLS 정책 **4개**를 현재 시점에서 백업했습니다. 이 저장소에 기존 사전 백업은 없었으므로, **2026-10-13에 새로 만든 사본**이라는 한계를 명시합니다. 과거 침해 발생 전부터 보유한 백업이라고 주장하지 않습니다.
+- `sql/10_verified_recovery.sql`(Supabase에 마이그레이션 이름 `stage10_verified_private_recovery_backups`로 적용됨)은 `a10_note_backups`(비공개 사본), `a10_policy_backups`(안전 정책), `a10_test_policies`(별도 시험 정책), `a10_recovery_audit`(추가 전용 감사 기록)을 만듭니다. 사본·감사 기록의 수정/삭제 트리거와 RLS, 일반 계정 직접 접근 거부를 설정했습니다.
+- **시험 정책 미리보기:** 검증된 심판 JWT를 지닌 클라이언트의 `GET /api/restore/policy`. 저장된 사본의 SHA-256을 다시 계산해 검증하고 `scope: "test_only"`, `backupVersion`, 변경된 규칙 이름과 양쪽 정의 해시만 반환합니다. 정책 원문·비밀값은 반환하지 않습니다. 사본·시험 정책 누락이나 해시 불일치 시 차이 계산/복원 자체를 거부합니다. 일반 사용자나 요청 본문 role=admin은 접근할 수 없습니다.
+
+### 제작 2 — 변경 범위 확인 후 시험 정책만 롤백
+
+- `POST /api/restore/policy`에 `{"confirm":true,"expectedVersion":"<미리보기에서 받은 SHA-256>"}`를 보냅니다. 검증된 심판 JWT만 허용합니다. 버전 재검사와 시험 정책 변경은 DB 트랜잭션으로 실행하며 **`a10_test_policies`만 복원**합니다. 운영 `pg_policies` / `a02_private_notes` RLS 정책 정의는 변경하지 않습니다. 감사 기록은 추가만 가능하며 보존합니다.
+- 실제 SQL 트랜잭션의 **합성 시험**에서 `notes_owner_select` 시험 규칙을 일부러 완화하고 미리보기 차이 1건 → 이전 안전 정의 복구 1건 → 차이 0건을 확인한 뒤 **ROLLBACK**했습니다. 운영 정책·메모·감사 내역에 이 가상 시험 변경은 남기지 않았습니다.
+- 기존 `test/notes-ownership.test.mjs`는 **A 자기 자료 CRUD 성공, B의 A 자료 GET/PUT/DELETE 거부(404)**를 가상 DB로 검증합니다. 이는 시험 정책 복원의 실제 반 엔진 집행 증거가 아닙니다.
+
+### 제작 3 — 비공개 메모 한 건만 복원
+
+| 메서드·경로 | 인증 / 입력 | 결과 |
+| --- | --- | --- |
+| `GET /api/restore?id=<UUID>` | 검증된 B 사용자 로그인/JWT | 자기 소유 사본의 ID, ownerId, contentHash, titleHash, backupAt, 현재 존재 여부, 변경 여부. 본문·제목은 노출하지 않음 |
+| `POST /api/restore` | 검증된 B 사용자 로그인/JWT, JSON `{"id":"<UUID>","expectedHash":"<SHA-256>"}` | ID·검증된 신원에 따른 소유자·비공개 사본 내용/제목 해시를 검증한 뒤 **그 메모 1건만** 제목/본문 또는 삭제된 행을 원자 복원. 응답에는 id, ownerId, contentHash, restored만 포함 |
+| `GET /api/restore/policy` | 검증된 심판 JWT | 안전 정책/시험 정책 차이만 반환 |
+| `POST /api/restore/policy` | 검증된 심판 JWT, `confirm:true`, `expectedVersion` | 검증된 버전으로 시험 정책만 복원 |
+
+`expectedHash`는 GET 미리보기에서 확인하는 안전장치이며, 메모 복구 때 서버는 전달 여부와 무관하게 사본의 SHA-256 및 요청 신원과 사본 소유자의 일치를 검증합니다. 다른 소유자 자료는 404, 해시/현재 소유자 불일치와 손상된 사본은 실패로 중단합니다. 로그인은 기존 `createLoginVerifier`로 검증하고 권한 요청 body·header의 `owner_id`/`role`을 신뢰하지 않습니다. 쿠키 인증 POST는 동일 출처만 허용합니다. 기존 메모 CRUD의 JSON 응답은 변경하지 않았습니다.
+
+**향후 B 계정 메모 준비:** DB `a02_private_notes`에 나중에 새 메모가 만들어질 때 `AFTER INSERT` 트리거가 동일 트랜잭션 안에서 **첫 작성본만** 비공개 사본으로 만듭니다. 이로써 심판 시험에서 B 새 메모를 먼저 만들고 변조/삭제한 경우 최초 메모를 복구할 수 있습니다. 과거 사본을 덮어쓰지 않으며, ID가 다른 소유자로 재사용되는 것도 거부합니다.
+
+**실제 검증 범위:** 기존 메모 5건의 콘텐츠·제목 백업 해시 일치, 정책 사본 4개 무결성, 일반 권한의 백업 직접 읽기 거부, 운영 메모 건수 변경 없음 확인. 별도 합성 B 유사 메모를 SQL 트랜잭션 내 생성→변조→복원 및 삭제→복원해 ID/소유자/해시가 원본과 같음을 확인하고 트랜잭션 **ROLLBACK**. 실제 로그인된 B 계정에 대한 생산 DB 변조·삭제는 수행하지 않았으며, 심판의 공격 결과는 미확인입니다.
+
+### 제작 4 — 1~9단계 복구 후 재실행 순서
+
+| 순서 | 이전 단계 | 정상 확인 / 거부 확인 | 실행 증거 |
+| --- | --- | --- | --- |
+| 1 | 정적 메모 제거(1·2) | 공개 `/data.json` 404, 비로그인 메모 노출 없음 | Production GET 자기 점검 |
+| 2 | API 인증(3) | 인증 없는 메모 GET 401; 로그인 사용자 조회 성공 | Production 익명 401, 로그인은 모의/이전 사용자 보고 |
+| 3 | 메모 CRUD(3·4) | A 자기 메모 GET·POST·PUT·DELETE; B→A 상세 GET·PUT·DELETE 404 | `test/notes-ownership.test.mjs` 로컬 HTTP/모의 DB |
+| 4 | 서버 로그인(5) | 로그인/로그아웃/HttpOnly 쿠키 및 교차 Origin 변경 차단 | `test/server-auth.test.mjs`·`test/notes-cookie.test.mjs` |
+| 5 | 등록 기기(6) | 등록 요청 허용, 미등록 요청 거부 | `npm run decider:test` |
+| 6 | 추가 확인(7) | 정상 allow, 복합 이상 step_up, 완료 재판정 | `npm run fixture:7` 및 회귀 시험 |
+| 7 | 자원 구역(8) | 타인/목록/알 수 없는 경로·공지 쓰기 거부 | `test/stage8-*.test.mjs` 로컬; 공식 8단계 마지막 확인 48점, 미해결 위험 |
+| 8 | 도플갱어 탐지(9) | 120회 observe / 121회 회수 **제안**; 정상 기기 비영향 | `npm run detect:test`, `test/detect-*.test.mjs` |
+| 9 | 복구 안정성(10) | 사본 해시 검증·B 한 건만 복원·시험 정책 버전 복원·교차 소유자 거부 | `test/recovery-api.test.mjs` 및 DB 합성 트랜잭션 롤백 |
+| 10 | 실제 심판 재공격 | 자료 복구 직후 심판의 이전 단계 전체 공격 재전송 | **미실행**, 공식 심판 제출 후에만 확인 가능 |
+
+**재실행:** `npm run detect:test` → `npm run decider:test` → `npm run fixture:7` → `node --test test/*.test.mjs` 중 `package-starter.test.mjs`는 오래된 시작 틀 API 파일 목록과 현 구조가 달라 별도 실패 가능성이 있으므로 보안 회귀 CI에 포함하지 않음 → `npm run build -- --local` → `npm run bundle`. 보안 회귀는 GitHub Actions `.github/workflows/stage8-verify.yml`, 제출 묶음은 `.github/workflows/stage9-bundle.yml`(표시명 Stage 10 Submission Bundle)에서 실행해 아티팩트 `aleph-stage10-submission`으로 보관합니다.
+
+**복구 경로:** `restoreRoute: "/api/restore"` / `POST /api/restore`. 운영 Supabase 프로젝트에는 위 마이그레이션이 이미 적용되었으므로 중복 실행하지 마세요. 비밀값은 기존 서버 환경변수 `SUPABASE_URL`, `SUPABASE_SECRET_KEY`에서만 읽습니다. 제출은 학생만 수행하며 자동 테스트 통과를 공식 심판 점수로 바꾸어 서술하지 않습니다.
