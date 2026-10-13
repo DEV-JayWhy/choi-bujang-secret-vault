@@ -49,8 +49,15 @@ test('after-restore checks actually invoke authorized GET, foreign denial and re
   assert.equal(JSON.stringify(result).includes(foreign),false);
 });
 
-test('when foreign fixture is absent, missing attack is explicitly not_run',async()=>{
-  const detail=async(req,res)=>res.status(req.headers.authorization?200:401).json({id:self});
+test('when foreign fixture is absent, missing attack stays not_run without failing executed checks',async()=>{
+  const detail=async(req,res)=>{
+    const preview=req.url==='/api/restore/'+self;
+    const status=!req.headers.authorization||req.headers.authorization==='Bearer invalid'?401
+      :req.url==='/api/notes/export'?400:200;
+    return res.status(status).json(status!==200?{error:'denied'}
+      :preview?{id:self,ownerId:self,verified:true,contentHash,changedFields:[]}
+      :{id:self,body:'SECRET_B'});
+  };
   const db = {
     from() {
       return {
@@ -64,11 +71,12 @@ test('when foreign fixture is absent, missing attack is explicitly not_run',asyn
       };
     },
   };
-  const result=await checkAfterRestore({noteId:self,ownerId:self,authorization:token,db,detail});
+  const result=await checkAfterRestore({noteId:self,ownerId:self,authorization:token,db,detail,contentHash});
   const foreignTest=result.checks.find(x=>x.name==='other_owner_get_denied');
   assert.equal(foreignTest.passed,null);
   assert.equal(foreignTest.status,'not_run_no_foreign_fixture');
-  assert.equal(result.allExecutedChecksPassed,false);
+  assert.equal(result.allExecutedChecksPassed,true);
+  assert.equal(result.judgeFullReplay,'not_run');
 });
 
 test('production HTTP transport binds destination, denies redirects, and verifies returned content hash',async()=>{
