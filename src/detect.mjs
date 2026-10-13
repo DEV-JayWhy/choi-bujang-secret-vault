@@ -20,9 +20,46 @@ export function readDetectionEvents(events) {
   return safeEvents;
 }
 
-// Stage 9, 제작 1 only: keep the original observe behavior.
-// The 10-minute threshold and revocation proposal belong to 제작 2/3.
+// Stage 9, 제작 2/3: the published standalone detection contract is a
+// 10-minute sliding window with strictly more than 120 GETs by ONE subject.
+// Device/network signals are not part of this event contract; do not invent
+// them or infer an individual device from the pseudonymous subject.
+const WINDOW_MS = 10 * 60 * 1000;
+const READ_LIMIT = 120;
+
 export function detect(events) {
-  readDetectionEvents(events);
-  return { action: 'observe' };
+  const readsBySubject = new Map();
+  for (const event of readDetectionEvents(events)) {
+    if (event.method !== 'GET') continue;
+    const at = Date.parse(event.at);
+    let times = readsBySubject.get(event.subject);
+    if (!times) {
+      times = [];
+      readsBySubject.set(event.subject, times);
+    }
+    times.push(at);
+  }
+
+  // Select the chronologically first exceeded window, independent of input
+  // order. Its subject is a revocation PROPOSAL, never an actual revocation.
+  let first = null;
+  for (const [subject, times] of readsBySubject) {
+    if (times.length <= READ_LIMIT) continue;
+    times.sort((a, b) => a - b);
+    let start = 0;
+    for (let end = 0; end < times.length; end += 1) {
+      while (times[end] - times[start] >= WINDOW_MS) start += 1;
+      if (end - start + 1 > READ_LIMIT) {
+        if (!first || times[end] < first.at
+          || (times[end] === first.at && subject < first.subject)) {
+          first = { at: times[end], subject };
+        }
+        break;
+      }
+    }
+  }
+
+  return first
+    ? { action: 'propose_revocation', reasonCode: 'burst_read', subject: first.subject }
+    : { action: 'observe' };
 }
