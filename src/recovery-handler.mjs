@@ -52,7 +52,8 @@ export function inspectRecoveryRequest(req, policy) {
 function optionalJsonObject(req) {
   if (req.body === undefined || req.body === null || req.body === '') return {};
   const type = req.headers?.['content-type'] ?? '';
-  if (typeof req.body === 'string' && !/^application\/json(?:;|$)/iu.test(type)) return null;
+  if (!/^application\/json(?:;|$)/iu.test(type)
+      && !(typeof req.body === 'object' && req.body !== null && Object.keys(req.body).length === 0)) return null;
   try {
     const obj = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     return obj && typeof obj === 'object' && !Array.isArray(obj) ? obj : null;
