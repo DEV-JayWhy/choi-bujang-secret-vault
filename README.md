@@ -192,3 +192,44 @@ Preview에서 직접 확인할 항목: A/B 로그인 후 각자 메모 조회·�
 **실제 ZTNA 연동은 미완료입니다.** 기존 `starter.deny`는 모든 요청을 거부하고 확장 규칙 등록·만료 적용 계약과 검증된 사용자·장치 연결 기능이 없습니다. 정상·공유 IP 사용자를 안전하게 제외할 수 없으므로 거부 규칙은 등록하지 않습니다. 만료 시각은 후보 메타데이터이며 실제 차단·해제 효과를 증명하지 않습니다. 정상 요청 통과 검증도 불가능한 상태로 유지합니다.
 
 기존 로그인·CRUD 모의 회귀 및 실행기 테스트 9개 통과, `npm run build -- --local` 성공. 기존 xdr-01 파일·결과(10/9/9), 원본 경보, ZTNA·앱·배포 설정을 변경하지 않았습니다. 기존 `test:package` API 목록 불일치 실패는 미해결이며 이번 작업에서 재실행하지 않았습니다. 실제 로그인·운영 배포·DB·심판 검증은 이번 작업 범위에서 미실행입니다. GitHub 푸시·배포·심판 제출은 하지 않습니다.
+
+## 6단계 제작 2·3: 기기 등록 조건 (미커밋)
+
+기준 커밋: `27c03a9a532da89a155baa8e8a5ffa8d4293e960`. 2026-10-13 로컬에서 `docs/DECIDER_REQUEST.md`의 요청·응답 계약을 확인한 뒤 `src/decider.mjs`에 `device_registered`를 구현했습니다. `request.deviceRegistered === true`일 때만 `allow / approved`, 그 외에는 `deny / device_not_registered`를 반환합니다. 응답 다섯 항목과 요청 ID를 보존합니다.
+
+`starter.deny`는 기존 인증·권한 규칙이 아니라 모든 요청을 거부하는 미구현 시작 틀입니다. 정상 등록 요청도 차단하므로 해당 기본 응답과 규칙 ID를 새 기기 등록 규칙으로 교체했습니다. API의 인증·소유권 검사와 브라우저 화면은 변경하지 않았습니다. 위 xdr-02의 `starter.deny` 설명은 당시 기록이며, 이번 변경으로 XDR 자동 차단·만료 적용이나 운영 연동이 구현된 것은 아닙니다.
+
+실제 검증 순서:
+
+1. `git status --short`로 기존 미커밋 변경이 없음을 확인했습니다.
+2. 요청 계약과 기존 판정기·시험용 가상 요청을 읽고 기기 등록 규칙만 구현했습니다.
+3. `npm run decider:test`를 실행하여 종료 코드 0과 아래 출력을 확인했습니다.
+
+```text
+통과 · 등록 기기의 정상 요청
+통과 · 미등록 기기의 가상 요청
+이 명령은 가상 요청으로 연습하며 심판 통과 증거가 아닙니다.
+```
+
+4. 추가로 아래 명령을 실행해 정상·미등록·누락·잘못된 타입의 전체 응답 다섯 항목을 단언했습니다. 모두 통과했습니다.
+
+```sh
+node --input-type=module <<'JS'
+import assert from 'node:assert/strict';
+import { decide, RULE_IDS } from './src/decider.mjs';
+import { fixtureRequests } from './scripts/fixture-7.mjs';
+const { normal } = fixtureRequests();
+assert.deepEqual(RULE_IDS, ['device_registered']);
+for (const [label, value, expected] of [['true', true, 'allow'], ['false', false, 'deny'], ['누락', undefined, 'deny'], ['문자열 true', 'true', 'deny'], ['숫자 1', 1, 'deny'], ['null', null, 'deny']]) {
+  const input = { ...normal, deviceRegistered: value };
+  if (value === undefined) delete input.deviceRegistered;
+  const response = await decide(input);
+  assert.deepEqual(response, {schema:'aleph.decision.v1', requestId:input.requestId, decision:expected, reasonCode:expected === 'allow' ? 'approved' : 'device_not_registered', ruleIds:['device_registered']});
+  process.stdout.write(`${label}: ${response.decision} · ${response.reasonCode}\n`);
+}
+JS
+```
+
+추가 시험 결과: true는 `allow / approved`, false·누락·문자열 true·숫자 1·null은 모두 `deny / device_not_registered`였습니다. npm의 기존 환경 설정 `http-proxy`에 관한 경고가 출력됐지만 시험은 정상 종료했습니다.
+
+이 검증은 로컬 가상 요청 연습입니다. 실제 등록 기기의 브라우저 접속, 인증서 없는 mTLS 요청 거부, 다른 사용자 토큰과 기기의 조합 거부는 이번 작업에서 확인하지 않았으며 운영 엔진·심판의 검증 대상입니다. 브라우저가 직접 보낸 등록 상태를 신뢰하는 기능을 추가하지 않았습니다. 재실행 명령은 `npm run decider:test`이며 실제 화면 확인은 기존 자료실에서 로그인 후 메모 목록을 여는 순서입니다. 인증서·CA·개인키·서명 키는 생성하지 않았습니다. 기존 `test:package` 불일치는 이번 범위에서 재실행하거나 수정하지 않았습니다. 설정 step은 5로 보존했으며 커밋·bundle 생성·푸시·배포·심판 제출은 수행하지 않았습니다.
