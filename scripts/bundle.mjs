@@ -82,7 +82,7 @@ try {
   const targetLabel = checkTarget.origin === new URL(config.publicAppUrl).origin ? 'Production 설정 주소' : '별도 지정 검증 주소';
   const attackAttempts = await runAttackChecks({ ...config, publicAppUrl: checkTarget.origin });
   for (const attempt of attackAttempts) {
-    if (!['cross_owner_note_access', 'owner_change_rejected', 'database_rls_privileges'].includes(attempt.attackId)) {
+    if (!attempt.observed.startsWith('미')) {
       attempt.observed = `[HTTP 점검 대상 ${checkTarget.hostname}] ${attempt.observed}`;
     }
   }

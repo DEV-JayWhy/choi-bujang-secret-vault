@@ -52,6 +52,9 @@ export async function runAttackChecks(config) {
     const expected = attackId === 'public_static_notes_removed'
       ? '현재 공개 data.json은 HTTP 404이며 메모를 반환하지 않음'
       : '인증 없는 요청 또는 잘못된 토큰은 HTTP 401이며 메모를 반환하지 않음';
+    if (config.step === 8 && method !== 'GET') {
+      return { attackId, expected, observed: '미실행: 8단계 Production 점검은 읽기 전용; 실제 서비스 변경 위험이 있는 쓰기 요청은 전송하지 않음' };
+    }
     try {
       const response = await fetch(new URL(path, app), {
         method, redirect: 'error', signal: AbortSignal.timeout(10000),
