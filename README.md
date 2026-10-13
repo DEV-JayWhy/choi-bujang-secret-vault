@@ -394,7 +394,7 @@ zone_grant 규칙과 zone_denied 이유 코드는 공개 2026-09-26 r1 원고에
 
 ## 10단계 저장점 — 검증된 사본에서 지정 자원 복원 (2026-10-13)
 
-**현재 코드:** `aleph.config.json.step = 10`. `restoreRoute = "/api/restore"`. 기존 `judgeIssuer`, `identityProvider`, 원본 API, 1~9단계 로그인·메모 CRUD·기기·추가 인증·자원 구역 정책·조회 폭주 탐지 함수는 보존합니다. GitHub 공개 저장소에는 비밀값/메모 본문을 넣지 않습니다.
+**현재 코드(10단계 재검증 후보):** `aleph.config.json.step = 10`. `restoreRoute = "/api/restore/:id"`. 기존 `judgeIssuer`, `identityProvider`, 원본 API, 1~9단계 로그인·메모 CRUD·기기·추가 인증·자원 구역 정책·조회 폭주 탐지 함수는 보존합니다. GitHub 공개 저장소에는 비밀값/메모 본문을 넣지 않습니다.
 
 ### 제작 1 — 정책 백업 무결성 및 차이 미리보기
 
@@ -440,4 +440,21 @@ zone_grant 규칙과 zone_denied 이유 코드는 공개 2026-09-26 r1 원고에
 
 **재실행:** `npm run detect:test` → `npm run decider:test` → `npm run fixture:7` → `node --test test/*.test.mjs` 중 `package-starter.test.mjs`는 오래된 시작 틀 API 파일 목록과 현 구조가 달라 별도 실패 가능성이 있으므로 보안 회귀 CI에 포함하지 않음 → `npm run build -- --local` → `npm run bundle`. 보안 회귀는 GitHub Actions `.github/workflows/stage8-verify.yml`, 제출 묶음은 `.github/workflows/stage9-bundle.yml`(표시명 Stage 10 Submission Bundle)에서 실행해 아티팩트 `aleph-stage10-submission`으로 보관합니다.
 
-**복구 경로:** `restoreRoute: "/api/restore"` / `POST /api/restore`. 운영 Supabase 프로젝트에는 위 마이그레이션이 이미 적용되었으므로 중복 실행하지 마세요. 비밀값은 기존 서버 환경변수 `SUPABASE_URL`, `SUPABASE_SECRET_KEY`에서만 읽습니다. 제출은 학생만 수행하며 자동 테스트 통과를 공식 심판 점수로 바꾸어 서술하지 않습니다.
+**복구 경로(현재):** `restoreRoute: "/api/restore/:id"` / `POST /api/restore/<UUID>`, 기존 `POST /api/restore`(본문에 `id` 지정)도 호환으로 유지. 운영 Supabase 프로젝트에는 위 마이그레이션이 이미 적용되었으므로 중복 실행하지 마세요. 비밀값은 기존 서버 환경변수 `SUPABASE_URL`, `SUPABASE_SECRET_KEY`에서만 읽습니다. 제출은 학생만 수행하며 자동 테스트 통과를 공식 심판 점수로 바꾸어 서술하지 않습니다.
+
+### 10단계 공식 12/100점 이후 재수정 — 아직 미제출
+
+**공식 첫 결과:** 기준 커밋 `4a9977ab0d21`은 **12/100점**이고, 실패 코드 **`S10_BACKUP_UNVERIFIED`·`S10_RESTORE_MISMATCH`·`S10_RETEST_MISSING`**를 받았습니다. '자료 복구 완결'이나 심판 통과로 서술하지 않습니다. 당시 운영 DB의 복원 감사 기록은 0건이었고, 복구가 심판 요청에 도달했는지 단정할 수 없었습니다. Vercel 런타임 로그는 연결된 권한으로 403이어서 실제 심판 HTTP 요청 형식을 확보하지 못했습니다.
+
+**실제 수정과 근거:**
+
+1. **복원 경로:** 10단계 일부 조건을 통과한 공개 구현의 입력 형태를 참고하여 `api/restore/[id].js`를 새로 추가했습니다. 현재 심판 제출 경로는 `POST /api/restore/:id`이며 UUID 1개만 선택합니다. `POST /api/restore/<UUID>`는 JSON 본문이 없어도 실행하고 `{"preview":true}`를 주면 복원 전 상태를 보여줍니다. 기존 `/api/restore`도 유지하지만 본문 없이 임의 메모를 복원하지 않습니다. 경로·본문의 다른 ID, 요청한 소유자/관리자 권한 주장은 거부합니다.
+2. **독립 사본 봉인:** 적용된 SQL `sql/10_versioned_seals.sql`는 `a10_note_seals`·`a10_policy_seals`에 사본 전체의 SHA-256 봉인값을 보관하고 수정·삭제를 거부합니다. 백업을 다시 읽을 때 원본 ID·소유자·제목·본문·생성시각을 독립 봉인값과 대조합니다. 사본이 새로 없으면 실패합니다. 기존 5건 사본은 **지금 새로 봉인한 것**으로, 과거 독립 오프사이트 백업을 증명하지 않습니다.
+3. **미리보기→실행 직전 재검증:** `a10_preview_verified_note`는 복원 대상의 백업 버전·현재 상태 버전·변경 필드(`title`,`content`,`create`)를 반환합니다. `a10_restore_versioned_note`는 원본 메모 한 건을 잠금한 뒤 백업+봉인+버전을 다시 검증하고 한 건만 복원합니다. 최종 ID·소유자·제목·내용 해시를 읽어서 확인하며, 실패 시 트랜잭션 전체를 되돌립니다. 시험 정책 복원은 별도 `/api/restore/policy`에서만 수행하며 운영 RLS 정의는 덮어쓰지 않습니다.
+4. **복원 뒤 재시험:** 실제 성공한 `POST /api/restore/<UUID>` 경로는 `src/post-restore-retest.mjs`에서 **복원 이후** 인증된 본인 GET(200), 비로그인 GET 거부(401), 알 수 없는 URL 거부(400), 확인 가능한 타인 소유 메모 GET 거부(404)를 실제 메모 API로 다시 요청합니다. 이어서 6·7단계 정상/미등록/복합 판정과 9단계 120/121건 가상 이벤트를 재시험합니다. 응답에는 상태와 통과 여부만 반환하며 타인 ID, 제목·본문·JWT는 기록하지 않습니다. 타인 시험 자료가 없으면 `not_run`으로 표시하며 **심판의 전체 1~9단계 서명 재공격/권한 회수 결과는 미실행**으로 구분합니다.
+
+**이미 실행한 검증:** 연결된 Supabase에서 임의 가상 메모 한 건을 **트랜잭션 내부에서만** 생성→변조→미리보기→복원, 삭제→미리보기→복원, 잘못된 버전 거부, 타인 소유자 거부, 봉인 재작성 거부, 복구 감사 기록 증가를 점검하고 마지막에 `ROLLBACK`했습니다. 기존 운영 메모는 변경하지 않았습니다. 이 시험은 실제 심판 B 토큰을 사용하는 HTTP 복원과 별개입니다.
+
+**재검증 순서:** `npm run detect:test` → `npm run decider:test` → `npm run fixture:7` → `node --test test/recovery-api.test.mjs test/post-restore-retest.test.mjs test/notes-ownership.test.mjs test/attack-check-readonly.test.mjs` → `npm run build -- --local` → `npm run bundle`. `stage8-verify.yml`과 `stage9-bundle.yml`은 각각 회귀 테스트·번들을 실행합니다.
+
+**현재 제한:** 고쳐진 경로와 재시험 로직으로도 심판 통과를 보장할 수 없습니다. 다음 공식 재제출 전에는 새 커밋의 GitHub Actions, Vercel Production 최신 해시, 제출 JSON 최신 해시가 모두 일치하는지 확인해야 합니다.
