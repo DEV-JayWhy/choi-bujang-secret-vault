@@ -19,7 +19,7 @@ jobs:
           if(response.status!==200)process.exit(1);
           const paths=[...new Set([...html.matchAll(/(?:src|href)="([^"]+\.js(?:\?[^"]*)?)"/g)].map(x=>x[1]))].slice(0,35);
           console.log('PUBLIC_JS_ASSETS',paths.length, JSON.stringify(paths));
-          for(const term of ['stage10','cortex','api/','submit','judge','assets/','script','S10_BACKUP_UNVERIFIED']){
+          for(const term of ['3차 침공','닭크웹','방어','침공','defense','attack','href=','/cortex','login','portal-state','서버']){
             const idx=html.toLowerCase().indexOf(term.toLowerCase());
             console.log('HTML_REFERENCE',JSON.stringify({term,found:idx>=0,
               excerpt:idx<0?'':html.slice(Math.max(0,idx-90),idx+190).replace(/[\r\n]/g,' ')}));
