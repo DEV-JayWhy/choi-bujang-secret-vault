@@ -14,7 +14,7 @@ test('restore UI provides an explicit before-and-after confirmation',()=>{
   assert.match(html,/id="restore-diff" hidden/u,'verified backup version hidden before preview');
   assert.match(html,/id="restore-execute" disabled/u,'mutation blocked until preview and approval');
   assert.match(script,/restoreExecute\.disabled = !restoreConfirm\.checked \|\| !restoredPreview/u);
-  assert.match(script,/await notesRequest\(\`\/api\/restore\/\$\{encodeURIComponent\(id\)\}\`\)/u,
+  assert.ok(script.includes('await notesRequest(`/api/restore/${encodeURIComponent(id)}`)'),
     'preview GET must target exactly one user-selected UUID');
   assert.match(script,/expectedVersion: preview\.backupVersion/u);
   assert.match(script,/expectedState: preview\.stateVersion/u);
