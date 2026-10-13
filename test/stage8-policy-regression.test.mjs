@@ -19,6 +19,11 @@ test('preserve legitimate note item GET and own collection GET', async () => {
   await expectDecision(withRoute('PUT', '/notes/demo', 'PUT /notes/:id'), 'allow');
 });
 
+test('reject query-filtered collection reads while preserving unfiltered own list', async () => {
+  await expectDecision({ ...withRoute('GET', '/notes', 'GET /notes'), queryLength: 0 }, 'allow');
+  await expectDecision({ ...withRoute('GET', '/notes', 'GET /notes'), queryLength: 19 }, 'deny');
+});
+
 test('reject unknown and bulk note paths', async () => {
   for (const path of ['/notes/export', '/notes/all', '/notes/bulk', '/notes/search', '/notes/admin', '/notes/../demo', '/notes/%64emo', '/notes/demo/extra']) {
     await expectDecision(withRoute('GET', path, 'GET /notes/:id'), 'deny');
