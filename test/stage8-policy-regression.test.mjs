@@ -76,7 +76,8 @@ test('item queries cannot change resource scope or bypass a verified step-up', a
 test('only the path-selected ID query is permitted, never functions or another owner scope', async () => {
   const id = '11111111-1111-4111-8111-111111111111';
   const req = withRoute('GET', '/notes/' + id, 'GET /notes/:id');
-  await expectDecision({ ...req, ...queryMetadata('id=' + id) }, 'allow');
+  await expectDecision({ ...req, ...queryMetadata('id=' + id) }, 'deny');
+  await expectDecision(req, 'allow');
   for (const query of ['id=22222222-2222-4222-8222-222222222222',
     'action=export', 'owner_id=another', 'role=instructor', 'id='+id+'&id='+id,
     'id='+id+'&action=export']) {
