@@ -106,7 +106,12 @@ export function notesHandler(detail) {
       // DB가 비교하는 소유자는 기존 도우미가 검증한 ID뿐입니다.
       // PUT은 owner_id를 입력에서 받지 않고 기존 값을 보존합니다.
       let query = db.from('a02_private_notes');
-      if (request.method === 'GET') query = query.select('id,title,content,owner_id').eq('id', id);
+      if (request.method === 'GET') {
+        const ownerCheck = await db.from('a02_private_notes').select('id,owner_id').eq('id', id).eq('owner_id', identity.userId).maybeSingle();
+        if (ownerCheck.error) return response.status(502).json({ error: 'NOTES_UNAVAILABLE' });
+        if (!ownerCheck.data || ownerCheck.data.owner_id !== identity.userId || ownerCheck.data.id !== id) return response.status(404).json({ error: 'NOTE_NOT_FOUND' });
+        query = query.select('id,title,content,owner_id').eq('id', id);
+      }
       if (request.method === 'PUT') query = query.update({ title: payload.title.trim(), content: payload.body })
         .eq('id', id).select('id,title,content,owner_id');
       if (request.method === 'DELETE') query = query.delete().eq('id', id).select('id');
