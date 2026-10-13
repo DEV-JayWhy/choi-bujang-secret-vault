@@ -74,6 +74,26 @@ export async function runAttackChecks(config) {
           && ['notes', 'title', 'body', 'content'].some(key => Object.hasOwn(data, key)));
       } catch { hasNotes = /실습용 가상 (과제|포트폴리오|리추얼|행정) 기록/u.test(text); }
       const target = attackId === 'public_static_notes_removed' ? 404 : 401;
+      if (attackId === 'restore_route_requires_login') {
+        // A second read-only probe validates Production has *working* server
+        // configuration, rather than a missing SUPABASE_SECRET_KEY that returns
+        // 401 for anonymous requests before it checks its environment.
+        let signedStatus = null, gate = 'request_failed';
+        try {
+          const signedProbe = await fetch(new URL(path, app), {
+            method: 'GET', redirect: 'error',
+            signal: AbortSignal.timeout(10000),
+            headers: { Authorization: 'Bearer invalid' },
+          });
+          signedStatus = signedProbe.status;
+          gate = signedProbe.headers.get('X-Aleph-Recovery-Checkpoint') ?? 'missing';
+          await signedProbe.body?.cancel();
+        } catch {}
+        const healthy = response.status === 401 && signedStatus === 401
+          && gate === 'auth_rejected';
+        return { attackId, expected: '비인증·위조 토큰은 401, 실제 서버 비밀 설정 확인 후 인증 단계에서 거부',
+          observed: `익명 HTTP ${response.status}; 위조 토큰 HTTP ${signedStatus ?? '미확인'}; 서버 단계 ${gate}; ${healthy ? '설정·인증 게이트 정상' : '설정·인증 게이트 확인 필요'}` };
+      }
       return { attackId, expected, observed: `HTTP ${response.status}; 메모 자료 ${hasNotes ? '감지됨' : '감지되지 않음'}; 기대 조건 ${response.status === target && !hasNotes ? '일치' : '불일치'}` };
     } catch {
       return { attackId, expected, observed: '요청 실패 또는 시간 초과: HTTP 상태·자료 반환 여부 미확인' };
