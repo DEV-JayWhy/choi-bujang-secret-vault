@@ -15,7 +15,7 @@ DECLARE
 BEGIN
   SELECT encode(extensions.digest(
     coalesce(string_agg(id::text || ':' || owner_id::text || ':' ||
-      encode(extensions.digest(title || chr(0) || content, 'sha256'), 'hex'),
+      encode(extensions.digest(title || chr(31) || content, 'sha256'), 'hex'),
       '|' ORDER BY id), ''), 'sha256'), 'hex')
     INTO others_before FROM public.a02_private_notes;
 
@@ -52,7 +52,7 @@ BEGIN
 
   SELECT encode(extensions.digest(
     coalesce(string_agg(id::text || ':' || owner_id::text || ':' ||
-      encode(extensions.digest(title || chr(0) || content, 'sha256'), 'hex'),
+      encode(extensions.digest(title || chr(31) || content, 'sha256'), 'hex'),
       '|' ORDER BY id), ''), 'sha256'), 'hex')
     INTO others_after FROM public.a02_private_notes WHERE id<>v_id;
   IF others_before IS DISTINCT FROM others_after THEN
