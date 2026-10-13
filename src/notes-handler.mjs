@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { cookieToken, sameOrigin } from './server-auth.mjs';
 import { createLoginVerifier } from './verify-login.mjs';
 import { RESOURCE_KINDS, NOTES_COLLECTION_RESOURCE_ID, resourceId } from './resource-ids.mjs';
+import { noteOwnerId } from './judge-ownership.mjs';
 
 const config = JSON.parse(readFileSync(new URL('../aleph.config.json', import.meta.url), 'utf8'));
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -57,6 +58,7 @@ export function notesHandler(detail) {
       verifyLogin ??= createLoginVerifier({ config, supabaseSecretKey: key });
       const identity = await verifyLogin(authorization);
       if (!identity) return response.status(401).json({ error: 'LOGIN_REQUIRED' });
+      const ownerId = noteOwnerId(identity);
       const resource = inspectNoteUrl(request, detail);
       if (!resource) {
         return response.status(400).json({ error: 'INVALID_ID' });
@@ -83,10 +85,10 @@ export function notesHandler(detail) {
       });
       if (!detail && request.method === 'GET') {
         const { data, error } = await db.from('a02_private_notes')
-          .select('id,title,content,owner_id').eq('owner_id', identity.userId).order('created_at', { ascending: true }).order('id');
+          .select('id,title,content,owner_id').eq('owner_id', ownerId).order('created_at', { ascending: true }).order('id');
         if (error) return response.status(502).json({ error: 'NOTES_UNAVAILABLE' });
         // Validate the complete result before serializing any title or body.
-        if (!Array.isArray(data) || data.some(row => !row || row.owner_id !== identity.userId
+        if (!Array.isArray(data) || data.some(row => !row || row.owner_id !== ownerId
             || typeof row.id !== 'string' || !UUID.test(row.id))) {
           return response.status(502).json({ error: 'NOTES_UNAVAILABLE' });
         }
@@ -96,7 +98,7 @@ export function notesHandler(detail) {
       if (request.method === 'POST') {
         const newId = payload.id ?? randomUUID();
         const { error } = await db.from('a02_private_notes').insert({
-          id: newId, owner_id: identity.userId, title: payload.title.trim(), content: payload.body,
+          id: newId, owner_id: ownerId, title: payload.title.trim(), content: payload.body,
         });
         if (error) return response.status(error.code === '23505' ? 409 : 502)
           .json({ error: error.code === '23505' ? 'ID_CONFLICT' : 'NOTES_UNAVAILABLE' });
@@ -107,24 +109,24 @@ export function notesHandler(detail) {
       // PUT은 owner_id를 입력에서 받지 않고 기존 값을 보존합니다.
       let query = db.from('a02_private_notes');
       if (request.method === 'GET') {
-        const ownerCheck = await db.from('a02_private_notes').select('id,owner_id').eq('id', id).eq('owner_id', identity.userId).maybeSingle();
+        const ownerCheck = await db.from('a02_private_notes').select('id,owner_id').eq('id', id).eq('owner_id', ownerId).maybeSingle();
         if (ownerCheck.error) return response.status(502).json({ error: 'NOTES_UNAVAILABLE' });
-        if (!ownerCheck.data || ownerCheck.data.owner_id !== identity.userId || ownerCheck.data.id !== id) return response.status(404).json({ error: 'NOTE_NOT_FOUND' });
+        if (!ownerCheck.data || ownerCheck.data.owner_id !== ownerId || ownerCheck.data.id !== id) return response.status(404).json({ error: 'NOTE_NOT_FOUND' });
         query = query.select('id,title,content,owner_id').eq('id', id);
       }
       if (request.method === 'PUT') query = query.update({ title: payload.title.trim(), content: payload.body })
         .eq('id', id).select('id,title,content,owner_id');
       if (request.method === 'DELETE') query = query.delete().eq('id', id).select('id');
-      const { data, error } = await query.eq('owner_id', identity.userId).maybeSingle();
+      const { data, error } = await query.eq('owner_id', ownerId).maybeSingle();
       if (error) return response.status(502).json({ error: 'NOTES_UNAVAILABLE' });
       if (!data) return response.status(404).json({ error: 'NOTE_NOT_FOUND' });
       // Defense in depth: do not return a note unless the DB row confirms ownership.
-      if (request.method === 'GET' && (typeof identity.userId !== 'string'
-          || data.owner_id !== identity.userId
+      if (request.method === 'GET' && (typeof ownerId !== 'string'
+          || data.owner_id !== ownerId
           || typeof data.id !== 'string' || data.id.toLowerCase() !== id)) {
         return response.status(404).json({ error: 'NOTE_NOT_FOUND' });
       }
-      if (request.method === 'PUT' && data.owner_id !== identity.userId) {
+      if (request.method === 'PUT' && data.owner_id !== ownerId) {
         return response.status(502).json({ error: 'NOTES_UNAVAILABLE' });
       }
       response.setHeader('X-Aleph-Resource-Id', resourceId(RESOURCE_KINDS.note, id));
