@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 // ALEPH SDP 엔진이 확인한 요청만 받는 학생 판정기 시작점입니다.
 // 6단계: 엔진이 확인한 기기 등록 여부가 true일 때만 허용합니다.
 // 요청 본문의 userId, role, 기기 키, 토큰을 별도로 믿거나 저장하지 마세요.
@@ -48,26 +50,32 @@ const ITEM_METHODS = new Set(['GET', 'PUT', 'DELETE']);
 // accepting every word makes collection/function/other-zone names look like IDs.
 const NOTE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 const EMPTY_QUERY_SHA256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+function querySelectsExactId(request, id) {
+  if (request.queryLength === 0 && request.querySha256 === EMPTY_QUERY_SHA256) return true;
+  if (!id) return false;
+  // The digest is not an owner credential. Compare it only to the one supported
+  // query, whose ID is already selected by the exact path. No function/filter
+  // names, duplicate IDs, role or owner query can match this representation.
+  const query = `id=${id}`;
+  return request.queryLength === query.length
+    && request.querySha256 === createHash('sha256').update(query).digest('hex');
+}
 export function inspectNoteRoute(request) {
   if (request?.service !== 'notes') return false;
   const { method, route, path } = request;
   if (typeof path !== 'string' || typeof route !== 'string' || typeof method !== 'string') return false;
-  // Both fields are mandatory in the engine contract. Missing or contradictory
-  // metadata cannot establish the no-query route; do not infer an owner/filter
-  // from a digest. Only the exact empty query is supported by this policy.
-  if (request.queryLength !== 0 || request.querySha256 !== EMPTY_QUERY_SHA256) return false;
   if (path === '/notes') {
     if (!COLLECTION_METHODS.has(method) || route !== `${method} /notes`) return false;
     // The engine provides only the query length and digest, not verified filter contents.
     // An unscoped collection request with query parameters cannot be authorized safely.
-    return true;
+    return querySelectsExactId(request);
   }
   if (!ITEM_METHODS.has(method) || route !== `${method} /notes/:id`) return false;
   // One literal ID segment, without URL normalization or decoding.
   const match = /^\/notes\/([^/?#]+)$/u.exec(path);
   if (!match) return false;
   const id = match[1];
-  return id === 'demo' || NOTE_UUID.test(id);
+  return (id === 'demo' || NOTE_UUID.test(id)) && querySelectsExactId(request, id);
 }
 
 export async function decide(request) {

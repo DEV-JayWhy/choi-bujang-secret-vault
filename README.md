@@ -367,3 +367,9 @@ zone_grant 규칙과 zone_denied 이유 코드는 공개 2026-09-26 r1 원고에
 미등록 기기는 device_not_registered 우선 거부, 허용 경로의 복합 사건은 기존 step_up_required를 유지합니다. 추가 인증 완료도 잘못된 경로를 우회하지 못합니다. API·JWT·소유자 검사·쿼리 ID 방어·화면·설정 step 8은 변경하지 않았습니다. 별도 미커밋 실험 파일 두 개는 보존하며 운영 모듈과 연결하지 않습니다.
 
 로컬 검증: `node --test test/stage8-routes.test.mjs test/stage6-7-regression.test.mjs test/notes-ownership.test.mjs test/notes-cookie.test.mjs test/server-auth.test.mjs test/attack-check-readonly.test.mjs` 31건 통과, `npm run decider:test` 4건 통과, `npm run fixture:7` 정상 allow·복합 step_up, `git diff --check` 통과. 로컬 통과는 운영 이유 코드나 실제 심판 성공을 보증하지 않습니다. 정상 CRUD·타인 GET/PUT/DELETE 404·소유자 목록·URL 충돌은 모의 DB/로컬 HTTP 시험입니다. 실제 공지 자원·강사 권한은 여전히 없습니다.
+
+## 8단계 저장점 — 원문 요구사항 재대조
+
+기준 b2203ff4af0b의 공식 결과는 48/100점, S08_OTHER_ZONE_ALLOWED입니다. 현재 수정은 경로와 같은 단일 id 쿼리만 판정기에서 허용하고, 최종 API에서 목록의 모든 owner_id 및 개별 GET의 요청 ID를 반환 전에 재대조합니다. 기존 인증·DB 소유자 필터·정상 기본 목록·demo/UUID·6/7단계 정책은 유지합니다. 강사 공지 API·DB는 저장소에 없으며 학생에게 공지 쓰기를 허용하지 않습니다. 세부 근거와 가설은 docs/STAGE8_POLICY_REVIEW.md에 기록했습니다.
+
+재실행: node --test test/stage8-policy-regression.test.mjs test/stage8-routes.test.mjs test/stage6-7-regression.test.mjs test/notes-ownership.test.mjs test/notes-cookie.test.mjs test/server-auth.test.mjs test/attack-check-readonly.test.mjs. 관련 테스트 42개 통과, npm run decider:test 4개 통과, npm run fixture:7 정상 allow·복합 step_up, npm run build -- --local 통과. 실제 배포·심판은 커밋 후 검증하며 로컬 테스트를 공식 성공으로 표현하지 않습니다.

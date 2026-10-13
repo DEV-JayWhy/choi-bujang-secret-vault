@@ -80,8 +80,13 @@ export function notesHandler(detail) {
       });
       if (!detail && request.method === 'GET') {
         const { data, error } = await db.from('a02_private_notes')
-          .select('id,title,content').eq('owner_id', identity.userId).order('created_at', { ascending: true }).order('id');
+          .select('id,title,content,owner_id').eq('owner_id', identity.userId).order('created_at', { ascending: true }).order('id');
         if (error) return response.status(502).json({ error: 'NOTES_UNAVAILABLE' });
+        // Validate the complete result before serializing any title or body.
+        if (!Array.isArray(data) || data.some(row => !row || row.owner_id !== identity.userId
+            || typeof row.id !== 'string' || !UUID.test(row.id))) {
+          return response.status(502).json({ error: 'NOTES_UNAVAILABLE' });
+        }
         return response.status(200).json(data.map(note));
       }
       if (request.method === 'POST') {
@@ -105,7 +110,8 @@ export function notesHandler(detail) {
       if (error) return response.status(502).json({ error: 'NOTES_UNAVAILABLE' });
       if (!data) return response.status(404).json({ error: 'NOTE_NOT_FOUND' });
       // Defense in depth: do not return a note unless the DB row confirms ownership.
-      if (request.method === 'GET' && data.owner_id !== identity.userId) {
+      if (request.method === 'GET' && (data.owner_id !== identity.userId
+          || typeof data.id !== 'string' || data.id.toLowerCase() !== id)) {
         return response.status(404).json({ error: 'NOTE_NOT_FOUND' });
       }
       if (request.method === 'PUT' && data.owner_id !== identity.userId) {

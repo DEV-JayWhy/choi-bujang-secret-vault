@@ -1,10 +1,13 @@
 import { test } from 'node:test';
+import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { fixtureRequests } from '../scripts/fixture-7.mjs';
 import { decide, inspectNoteRoute } from '../src/decider.mjs';
 
 const base = () => ({ ...fixtureRequests().normal, signals: { source: 'none', region: 'unknown', network: 'unknown', hour: 14 } });
 const withRoute = (method, path, route, service = 'notes') => ({ ...base(), method, path, route, service });
+const queryMetadata = query => ({ queryLength: query.length,
+  querySha256: createHash('sha256').update(query).digest('hex') });
 async function expectDecision(request, expected) {
   const result = await decide(request);
   assert.equal(result.decision, expected, JSON.stringify({ method: request.method, path: request.path, route: request.route, result }));
@@ -68,6 +71,19 @@ test('item queries cannot change resource scope or bypass a verified step-up', a
       stepUp: { verified: true, authAgeSeconds: 60 } }, 'deny');
   }
   await expectDecision({ ...request, queryLength: 0 }, 'allow');
+});
+
+test('only the path-selected ID query is permitted, never functions or another owner scope', async () => {
+  const id = '11111111-1111-4111-8111-111111111111';
+  const req = withRoute('GET', '/notes/' + id, 'GET /notes/:id');
+  await expectDecision({ ...req, ...queryMetadata('id=' + id) }, 'allow');
+  for (const query of ['id=22222222-2222-4222-8222-222222222222',
+    'action=export', 'owner_id=another', 'role=instructor', 'id='+id+'&id='+id,
+    'id='+id+'&action=export']) {
+    await expectDecision({ ...req, ...queryMetadata(query) }, 'deny');
+  }
+  await expectDecision({ ...withRoute('GET', '/notes', 'GET /notes'),
+    ...queryMetadata('id=' + id) }, 'deny');
 });
 
 test('reject instructor announcements and materials writes regardless of role', async () => {

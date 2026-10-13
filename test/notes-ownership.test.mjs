@@ -15,6 +15,7 @@ test('A/B own CRUD, cross-owner denial, owner spoof denial and unauthenticated d
   const previousUrl = process.env.SUPABASE_URL, previousKey = process.env.SUPABASE_SECRET_KEY;
   const userId = '11111111-1111-4111-8111-111111111111';
   const rows = new Map(); let writes = 0; let forceForeignGetRow = false;
+  let forceWrongGetId = false; let forceForeignListRow = false;
   const { privateKey, publicKey } = await generateKeyPair('ES256');
   const jwk = await exportJWK(publicKey); Object.assign(jwk, { kid: 'local-test', alg: 'ES256', use: 'sig' });
   const token = await new SignJWT({ role: 'authenticated' }).setProtectedHeader({ alg: 'ES256', kid: jwk.kid })
@@ -79,9 +80,13 @@ test('A/B own CRUD, cross-owner denial, owner spoof denial and unauthenticated d
       }
       if (init.method === 'DELETE') { writes++; const row = visible ? rows.get(id) : undefined; if (visible) rows.delete(id); return json(row ? { id } : null); }
       if (id) return json(forceForeignGetRow && rows.has(id)
-        ? [{ ...rows.get(id), owner_id: bId }] : visible ? [rows.get(id)] : []);
+        ? [{ ...rows.get(id), owner_id: bId }]
+        : forceWrongGetId && rows.has(id) ? [{ ...rows.get(id), id: bId }]
+        : visible ? [rows.get(id)] : []);
       const owner = url.searchParams.get('owner_id')?.slice(3); assert.ok([userId, bId].includes(owner));
-      return json([...rows.values()].filter(row => row.owner_id === owner));
+      const list = [...rows.values()].filter(row => row.owner_id === owner);
+      if (forceForeignListRow && list.length) list.push({ ...list[0], id: bId, owner_id: bId });
+      return json(list);
     };
     for (const [handler, method] of [[collection, 'GET'], [collection, 'POST'], [detail, 'GET'], [detail, 'PUT'], [detail, 'DELETE']]) {
       const res = await call(handler, method, {}, userId, {}); assert.equal(res.code, 401); assert.ok(!res.body.notes);
@@ -103,6 +108,16 @@ test('A/B own CRUD, cross-owner denial, owner spoof denial and unauthenticated d
     assert.equal(res.code, 404);
     assert.deepEqual(res.body, { error: 'NOTE_NOT_FOUND' });
     forceForeignGetRow = false;
+    forceWrongGetId = true;
+    res = await call(detail, 'GET', undefined, id);
+    assert.equal(res.code, 404);
+    assert.deepEqual(res.body, { error: 'NOTE_NOT_FOUND' });
+    forceWrongGetId = false;
+    forceForeignListRow = true;
+    res = await call(collection, 'GET');
+    assert.equal(res.code, 502);
+    assert.deepEqual(res.body, { error: 'NOTES_UNAVAILABLE' });
+    forceForeignListRow = false;
     res = await call(collection, 'GET'); assert.equal(res.body.length, 1);
     res = await call(detail, 'PUT', { title: 'changed', body: 'changed body' }, id);
     assert.equal(res.code, 200); assert.equal(res.body.body, 'changed body'); assert.equal(rows.get(id).owner_id, userId);
