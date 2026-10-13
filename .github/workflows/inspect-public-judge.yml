@@ -18,7 +18,7 @@ jobs:
           console.log('PAGE',JSON.stringify({status:response.status,url:response.url,length:html.length}));
           if(response.status!==200)process.exit(1);
           const paths=[...new Set([...html.matchAll(/(?:src|href)="([^"]+\.js(?:\?[^"]*)?)"/g)].map(x=>x[1]))].slice(0,35);
-          console.log('PUBLIC_JS_ASSETS',paths.length);
+          console.log('PUBLIC_JS_ASSETS',paths.length, JSON.stringify(paths));
           const patterns=[/S10_BACKUP_UNVERIFIED/g,/S10_RESTORE_MISMATCH/g,/S10_RETEST_MISSING/g,/backupVersion/g,/restoreRoute/g,/judgeIssuer/g,/\/api\/restore/g,/changedFields/g,/postRestoreRetest/g];
           for(const path of paths){
             try{
