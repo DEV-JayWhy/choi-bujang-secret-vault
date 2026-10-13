@@ -80,7 +80,7 @@ jobs:
           assert.ok(data.policyRules.includes('resource_zone'));
           assert.equal(data.attackAttempts.length, 20);
           assert.equal(data.restoreRoute, '/api/restore/:id');
-          assert.match(data.attackAttempts.find(x => x.attackId === 'restore_route_requires_login').observed, /HTTP 401; 메모 자료 감지되지 않음; 기대 조건 일치/u);
+          assert.match(data.attackAttempts.find(x => x.attackId === 'restore_route_requires_login').observed, /익명 HTTP 401; 위조 토큰 HTTP 401; 서버 단계 auth_rejected; 설정·인증 게이트 정상/u);
           for (const id of ['stage10_backup_revalidation', 'stage10_restoration_full_replay']) {
             assert.match(data.attackAttempts.find(x => x.attackId === id).observed, /^미실행/u);
           }

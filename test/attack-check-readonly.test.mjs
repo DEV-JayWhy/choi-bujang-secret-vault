@@ -31,10 +31,10 @@ test('stage 8 self-check sends only GET and labels skipped writes; stage 7 prese
       /121건 결과 propose_revocation; 이유 burst_read; 기대 조건 일치/u);
     methods.length = 0;
     const ten = await runAttackChecks({ ...config, step: 10 });
-    assert.deepEqual(methods, ['GET', 'GET', 'GET', 'GET', 'GET']);
+    assert.deepEqual(methods, ['GET', 'GET', 'GET', 'GET', 'GET', 'GET']);
     assert.equal(ten.length, 20);
     assert.match(ten.find(row => row.attackId === 'restore_route_requires_login').observed,
-      /HTTP 401; 메모 자료 감지되지 않음; 기대 조건 일치/u);
+      /익명 HTTP 401; 위조 토큰 HTTP 401; 서버 단계 missing; 설정·인증 게이트 확인 필요/u);
     for (const id of ['stage10_backup_revalidation', 'stage10_restoration_full_replay']) {
       assert.match(ten.find(row => row.attackId === id).observed, /^미실행/u);
     }
