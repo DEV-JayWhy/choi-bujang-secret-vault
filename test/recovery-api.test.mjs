@@ -47,6 +47,8 @@ test('restore URL must select only exact resource and an authorized method', () 
     { kind: 'note', id: noteId });
   assert.deepEqual(inspectRecoveryRequest({ method: 'POST', url: '/api/restore' }, false),
     { kind: 'note' });
+  assert.deepEqual(inspectRecoveryRequest({ method: 'POST', url: '/api/restore?id='+noteId }, false),
+    { kind: 'note', id: noteId });
   assert.deepEqual(inspectRecoveryRequest({ method: 'GET', url: '/api/restore/policy' }, true),
     { kind: 'policy' });
   assert.deepEqual(inspectRecoveryRequest({ method: 'POST', url: '/api/restore/'+noteId }, false),
@@ -125,6 +127,8 @@ test('signed B may preview and restore one matching sealed backup via path or bo
   }});
   result=await run(handler,{method:'POST',body:{id:noteId,expectedHash:hash}});
   assert.equal(result.statusCode,200,'existing POST /api/restore JSON callers continue to work');
+  result=await run(handler,{method:'POST',url:'/api/restore?id='+noteId,body:undefined});
+  assert.equal(result.statusCode,200,'exact query ID POST uses same sealed restore path');
   as=otherStudent;
   result=await run(handler,{method:'POST',url:'/api/restore/'+noteId,body:{}});
   assert.equal(result.statusCode,404);
