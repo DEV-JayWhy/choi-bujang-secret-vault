@@ -86,7 +86,15 @@ test('signed B may preview and restore one matching sealed backup via path or bo
     throw new Error('unexpected_rpc');
   } };
   let as = student;
-  const handler = createRecoveryHandler(false, {verify:async()=>as,makeClient:()=>client});
+  const checksAfter = [];
+  const handler = createRecoveryHandler(false, { verify: async () => as, makeClient: () => client,
+    retest: async input => {
+      checksAfter.push({ noteId: input.noteId, ownerId: input.ownerId });
+      return { executedAfterRestore: true, checks: [
+        { name: 'restored_owner_get', passed: true },
+      ], allExecutedChecksPassed: true, judgeFullReplay: 'not_run' };
+    },
+  });
   let result = await run(handler, { url:'/api/restore?id='+noteId });
   assert.equal(result.statusCode,200);
   assert.deepEqual(result.body,item);
@@ -99,6 +107,8 @@ test('signed B may preview and restore one matching sealed backup via path or bo
   assert.equal(result.statusCode,200,'judge may POST the UUID path with no body');
   assert.equal(result.body.restored,true);
   assert.equal(state,'restored');
+  assert.equal(result.body.postRestoreRetest.executedAfterRestore, true);
+  assert.deepEqual(checksAfter.at(-1), { noteId, ownerId: ownId });
   assert.equal(calls.at(-2).fn,'a10_preview_verified_note');
   assert.deepEqual(calls.at(-1), {fn:'a10_restore_versioned_note',args:{
     p_note_id:noteId,p_owner_id:ownId,p_expected_version:manifest,p_expected_state:hash,
