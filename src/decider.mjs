@@ -47,14 +47,15 @@ const ITEM_METHODS = new Set(['GET', 'PUT', 'DELETE']);
 // the literal demo ID. A syntactically safe word is not a known note resource:
 // accepting every word makes collection/function/other-zone names look like IDs.
 const NOTE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+const EMPTY_QUERY_SHA256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
 export function inspectNoteRoute(request) {
   if (request?.service !== 'notes') return false;
   const { method, route, path } = request;
   if (typeof path !== 'string' || typeof route !== 'string' || typeof method !== 'string') return false;
-  // No query-selected operation or owner scope is present in the contract.
-  // Omitted metadata is retained only for older local fixtures; the engine
-  // supplies queryLength. Its digest cannot establish a query's authorization.
-  if (request.queryLength !== undefined && request.queryLength !== 0) return false;
+  // Both fields are mandatory in the engine contract. Missing or contradictory
+  // metadata cannot establish the no-query route; do not infer an owner/filter
+  // from a digest. Only the exact empty query is supported by this policy.
+  if (request.queryLength !== 0 || request.querySha256 !== EMPTY_QUERY_SHA256) return false;
   if (path === '/notes') {
     if (!COLLECTION_METHODS.has(method) || route !== `${method} /notes`) return false;
     // The engine provides only the query length and digest, not verified filter contents.

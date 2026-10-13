@@ -5,6 +5,8 @@ const base = {
   requestId: 'test-request', deviceRegistered: true, service: 'notes', method: 'GET',
   path: '/notes/demo', route: 'GET /notes/:id', signals: { source: 'none' },
   stepUp: { verified: false, authAgeSeconds: null }, recentEvents: [],
+  queryLength: 0,
+  querySha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
 };
 const allowed = [
   ['GET', '/notes', 'GET /notes'], ['POST', '/notes', 'POST /notes'],

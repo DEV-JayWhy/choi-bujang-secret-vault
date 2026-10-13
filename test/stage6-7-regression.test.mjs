@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { decide } from '../src/decider.mjs';
 const base = {requestId:'r',service:'notes',method:'GET',path:'/notes/demo',route:'GET /notes/:id',deviceRegistered:true,
+  queryLength:0,querySha256:'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
   stepUp:{verified:false,authAgeSeconds:null},recentEvents:[],signals:{source:'judge_fixture',region:'local',network:'usual',hour:14}};
 test('normal request allowed',async()=>assert.equal((await decide(base)).decision,'allow'));
 test('unregistered device denied',async()=>assert.equal((await decide({...base,deviceRegistered:false})).reasonCode,'device_not_registered'));

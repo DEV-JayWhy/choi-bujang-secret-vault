@@ -24,6 +24,18 @@ test('reject query-filtered collection reads while preserving unfiltered own lis
   await expectDecision({ ...withRoute('GET', '/notes', 'GET /notes'), queryLength: 19 }, 'deny');
 });
 
+test('missing or contradictory query metadata cannot authorize an item or collection', async () => {
+  for (const [path, route] of [['/notes', 'GET /notes'], ['/notes/demo', 'GET /notes/:id']]) {
+    const normal = withRoute('GET', path, route);
+    for (const patch of [
+      { queryLength: undefined }, { querySha256: undefined },
+      { querySha256: '' }, { querySha256: '0'.repeat(64) },
+      { queryLength: 1 }, { queryLength: null },
+    ]) await expectDecision({ ...normal, ...patch }, 'deny');
+    await expectDecision(normal, 'allow');
+  }
+});
+
 test('reject unknown and bulk note paths', async () => {
   for (const path of ['/notes/export', '/notes/all', '/notes/bulk', '/notes/search', '/notes/admin', '/notes/../demo', '/notes/%64emo', '/notes/demo/extra']) {
     await expectDecision(withRoute('GET', path, 'GET /notes/:id'), 'deny');
