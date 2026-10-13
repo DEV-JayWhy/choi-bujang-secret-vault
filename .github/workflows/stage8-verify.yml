@@ -37,7 +37,7 @@ jobs:
       - name: Stage 9-10 detector, restore identity and backup policy regressions
         run: |
           npm run detect:test
-          node --test test/detect-input.test.mjs test/detect-window.test.mjs test/attack-check-readonly.test.mjs test/recovery-api.test.mjs test/post-restore-retest.test.mjs
+          node --test test/detect-input.test.mjs test/detect-window.test.mjs test/attack-check-readonly.test.mjs test/recovery-api.test.mjs test/post-restore-retest.test.mjs test/stage10-submission-contract.test.mjs
       - name: Existing decision fixtures
         run: |
           npm run decider:test
