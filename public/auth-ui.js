@@ -16,6 +16,106 @@ const noteBody = document.querySelector('#note-body');
 const noteMessage = document.querySelector('#note-message');
 const saveNote = document.querySelector('#save-note');
 const cancelNote = document.querySelector('#cancel-note');
+const recoveryPanel = document.querySelector('#recovery-panel');
+const restoreForm = document.querySelector('#restore-preview-form');
+const restoreId = document.querySelector('#restore-id');
+const restorePreviewButton = document.querySelector('#restore-preview-button');
+const restoreDiff = document.querySelector('#restore-diff');
+const restoreInfo = document.querySelector('#restore-preview-info');
+const restoreConfirm = document.querySelector('#restore-confirm');
+const restoreExecute = document.querySelector('#restore-execute');
+const restoreMessage = document.querySelector('#restore-message');
+const restoreUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+let restoredPreview = null;
+function resetRestorePreview() {
+  restoredPreview = null;
+  restoreDiff.hidden = true;
+  restoreConfirm.checked = false;
+  restoreExecute.disabled = true;
+  restoreInfo.textContent = '';
+}
+function resetRecoveryPanel() {
+  resetRestorePreview();
+  restoreId.value = '';
+  restoreMessage.textContent = '';
+}
+function verifyRestorePreview(preview, requestedId) {
+  const sha = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+  if (!preview || preview.verified !== true || preview.id !== requestedId
+      || typeof preview.ownerId !== 'string' || !restoreUuid.test(preview.ownerId)
+      || !sha(preview.backupVersion) || !sha(preview.stateVersion)
+      || !sha(preview.contentHash) || !sha(preview.titleHash)
+      || !Array.isArray(preview.changedFields)
+      || preview.changedFields.some(name => !['title','content','create'].includes(name))) {
+    throw new Error('복구 사본의 검증 정보가 일치하지 않습니다.');
+  }
+  return preview;
+}
+restoreId.addEventListener('input', () => {
+  resetRestorePreview();
+  restoreMessage.textContent = '';
+});
+restoreConfirm.addEventListener('change', () => {
+  restoreExecute.disabled = !restoreConfirm.checked || !restoredPreview;
+});
+restoreForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  resetRestorePreview();
+  restoreMessage.textContent = '';
+  const id = restoreId.value.trim().toLowerCase();
+  if (!restoreUuid.test(id) || !currentSession?.user) {
+    restoreMessage.textContent = '로그인 후 메모 UUID를 확인해 주세요.';
+    return;
+  }
+  const owner = currentSession.user.id;
+  const current = generation;
+  restorePreviewButton.disabled = true;
+  try {
+    const preview = verifyRestorePreview(
+      await notesRequest(`/api/restore/${encodeURIComponent(id)}`), id);
+    if (generation !== current || currentSession?.user?.id !== owner) return;
+    restoredPreview = preview;
+    restoreInfo.textContent = `대상 ID: ${preview.id} / 소유자: ${preview.ownerId} / 사본 버전: ${preview.backupVersion} / 현재 상태 버전: ${preview.stateVersion} / 변경 항목: ${preview.changedFields.join(', ') || '변경 없음'} / 사본 내용 SHA-256: ${preview.contentHash}`;
+    restoreDiff.hidden = false;
+    restoreMessage.textContent = '검증된 사본 정보를 읽었습니다. 내용을 확인하고 복원을 승인하세요.';
+  } catch (error) {
+    if (generation === current) restoreMessage.textContent = error.message;
+  } finally {
+    restorePreviewButton.disabled = false;
+  }
+});
+restoreExecute.addEventListener('click', async () => {
+  const preview = restoredPreview;
+  if (!preview || !restoreConfirm.checked || !currentSession?.user) return;
+  const user = currentSession.user.id;
+  const current = generation;
+  restoreExecute.disabled = true;
+  restoreMessage.textContent = '지정한 한 건을 복원하고 확인하는 중입니다.';
+  try {
+    const result = await notesRequest(`/api/restore/${encodeURIComponent(preview.id)}`,
+      'POST', {
+        expectedVersion: preview.backupVersion,
+        expectedState: preview.stateVersion,
+        expectedHash: preview.contentHash,
+      });
+    if (generation !== current || currentSession?.user?.id !== user) return;
+    if (result.restored !== true || result.verified !== true
+        || result.id !== preview.id || result.ownerId !== preview.ownerId
+        || result.contentHash !== preview.contentHash) {
+      throw new Error('복원 후 ID·소유자·내용 해시가 일치하지 않습니다.');
+    }
+    const check = result.postRestoreRetest;
+    restoreMessage.textContent = `메모 한 건 복원 완료. 복원 후 확인: ${check?.allExecutedChecksPassed === true ? '실행한 검사 통과' : '추가 확인 필요'}. 심판 전체 재공격은 별도로 검증해야 합니다.`;
+    resetRestorePreview();
+    await loadNotes(currentSession);
+  } catch (error) {
+    if (generation === current) {
+      restoreMessage.textContent = error.message;
+      resetRestorePreview();
+    }
+  }
+});
+
 function resetEditor() {
   editingId = null; noteForm.reset(); saveNote.textContent = '추가';
   document.querySelector('#editor-heading').textContent = '메모 추가'; cancelNote.hidden = true;
@@ -71,6 +171,7 @@ async function loadNotes(session) {
         if (!window.confirm('이 메모를 삭제할까요?')) return;
         remove.disabled = true;
         try {
+          resetRestorePreview();
           await notesRequest(`/api/notes/${encodeURIComponent(note.id)}`, 'DELETE');
           if (current !== generation) return;
           if (editingId === note.id) resetEditor();
@@ -87,6 +188,7 @@ async function loadNotes(session) {
 noteForm.addEventListener('submit', async event => {
   event.preventDefault(); const current = generation; saveNote.disabled = true; cancelNote.disabled = true;
   try {
+    resetRestorePreview();
     await notesRequest(editingId ? `/api/notes/${encodeURIComponent(editingId)}` : '/api/notes',
       editingId ? 'PUT' : 'POST', { title: noteTitle.value, body: noteBody.value });
     if (current !== generation) return;
@@ -100,6 +202,8 @@ function render(session) {
   const changedUser = currentSession?.user?.id !== session?.user?.id;
   currentSession = session;
   const signedIn = Boolean(session?.user);
+  recoveryPanel.hidden = !signedIn;
+  if (!signedIn || changedUser) resetRecoveryPanel();
   status.textContent = signedIn ? `로그인됨: ${session.user.email ?? '사용자'}` : '로그아웃 상태';
   form.hidden = signedIn; logout.hidden = !signedIn; editor.hidden = !signedIn; password.value = '';
   if (!signedIn || changedUser) { resetEditor(); noteMessage.textContent = ''; }
