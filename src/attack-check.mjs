@@ -46,7 +46,7 @@ export async function runAttackChecks(config) {
     throw new Error('실제 배포 주소를 확인해 주세요.');
   }
   const missingId = '00000000-0000-4000-8000-000000000123';
-  const httpObserved = new Set();
+  const httpObserved = new Map();
   const cases = [
     ['anonymous_note_list', 'GET', '/api/notes'],
     ['anonymous_note_create', 'POST', '/api/notes'],
@@ -73,7 +73,7 @@ export async function runAttackChecks(config) {
         ...(['POST', 'PUT'].includes(method) ? { body: JSON.stringify({ title: 'self-check', body: '' }) } : {}),
       });
       const text = await response.text();
-      httpObserved.add(attackId);
+      httpObserved.set(attackId, response.status);
       let hasNotes = false;
       try {
         const data = JSON.parse(text);
@@ -82,6 +82,9 @@ export async function runAttackChecks(config) {
       } catch { hasNotes = /실습용 가상 (과제|포트폴리오|리추얼|행정) 기록/u.test(text); }
       const target = attackId === 'public_static_notes_removed' ? 404 : 401;
       if (attackId === 'restore_route_requires_login') {
+        if (config.step >= 12) {
+          return { attackId, expected: '익명 복원 GET은 HTTP 401로 거부', observed: `HTTP ${response.status}` };
+        }
         // A second read-only probe validates Production has *working* server
         // configuration, rather than a missing SUPABASE_SECRET_KEY that returns
         // 401 for anonymous requests before it checks its environment.
@@ -183,7 +186,7 @@ export async function runAttackChecks(config) {
     ]) {
       try {
         const response = await fetch(new URL(path, app), { redirect: 'error', signal: AbortSignal.timeout(10000), ...evidence(config, attackId) });
-        httpObserved.add(attackId);
+        httpObserved.set(attackId, response.status);
         let body; try { body = await response.json(); } catch { body = null; }
         const valid = attackId === 'stage11_manifest'
           ? response.status === 200 && typeof body?.name === 'string' && body.start_url === '/' && Array.isArray(body.icons)
@@ -200,8 +203,8 @@ export async function runAttackChecks(config) {
     const expected = '현재 커밋의 HTTP 200 작전실 기록, 실제 API 결과·미실행 구분, 공식 41종을 임의 통과 처리하지 않음';
     try {
       const response = await fetch(new URL('/api/checks', app), { redirect: 'error', signal: AbortSignal.timeout(120000), ...evidence(config, attackId) });
+      httpObserved.set(attackId, response.status);
       const report = await response.json();
-      httpObserved.add(attackId);
       const counts = report?.counts;
       const match = response.status === 200 && report.schema === 'aleph.operations.v1'
         && (!config.checkedCommit || report.commit === config.checkedCommit)
@@ -213,8 +216,8 @@ export async function runAttackChecks(config) {
   if (config.step >= 12) {
     // Local fixtures and skipped requests are not HTTP evidence. Preserve their
     // separate test commands; the current submission uses the exact sentinel.
-    for (const item of results) if (!httpObserved.has(item.attackId)
-        || !/^(?:HTTP|익명 HTTP) /.test(item.observed)) item.observed = 'not_run';
+    for (const item of results) item.observed = httpObserved.has(item.attackId)
+      ? `HTTP ${httpObserved.get(item.attackId)}` : 'not_run';
   }
   return results;
 }

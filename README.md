@@ -26,6 +26,8 @@
 
 운영자 공개 표본 `ChoiTimo/byteback-sample-pass`의 src/attack-check.mjs에 근거해 실제 fetch에 `alephEvidence: {caseId, requestKey}`를 넣습니다. 이는 sandbox runner의 요청별 대조용 메타데이터이며 HTTP 헤더·URL·권한 값으로 보내지 않습니다. 요청을 보내지 않은 항목과 로컬 fixture는 이번 제출 묶음에서 observed를 정확히 `not_run`으로 남깁니다. 로컬 판정·탐지 연습 결과는 별도 테스트 로그로 보존합니다. 실제 HTTP 응답을 읽어 기록한 항목만 runner 요청 기록과 연결합니다.
 
+2차 실제 심판은 b83e243125cb4d7735eacdedc9a442543109d5b2에서 53/100점, 같은 S12_SCREEN_MISMATCH입니다. 요청별 연결은 인식됐으나 observed의 설명 문장과 한 attackId의 복수 요청을 거부했습니다. 3차 후보는 각 실제 점검을 한 요청으로 제한하고 observed를 `HTTP <실제 상태>` 또는 `not_run`으로만 출력합니다. 자세한 수치·서버 기록·가상 시험은 작전실 JSON 및 별도 로그에서 확인합니다. 12단계의 익명 복원 GET은 한 요청의 401만 관측하며, 10~11단계의 기존 별도 설정/위조 토큰 검사 동작은 보존합니다.
+
 ## 설치·실행·중지·복구와 출처
 
 검사 커밋은 제출 JSON의 commit과 배포 `/aleph.json`의 commit이 같은 값이어야 합니다. 11단계 작동 기준점은 `529269c50a147446a53787e8a31a465ec3bc78f4`입니다.

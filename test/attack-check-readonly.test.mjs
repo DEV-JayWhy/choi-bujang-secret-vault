@@ -59,9 +59,12 @@ test('stage 12 binds every actual HTTP result to its attackId and uses exact not
  try{
   const out=await runAttackChecks({step:12,publicAppUrl:'https://fixture.vercel.app',checkedCommit:'a'.repeat(40)});
   assert.equal(out.length,20);const observed=out.filter(x=>x.observed!=='not_run');assert.equal(observed.length,8);
+  assert.equal(calls.length,8);
   const ids=new Set(out.map(x=>x.attackId));
   for(const {options} of calls){assert.ok(options.method===undefined||options.method==='GET');assert.equal(typeof options.alephEvidence?.caseId,'string');assert.ok(ids.has(options.alephEvidence.caseId));assert.ok(!new Headers(options.headers).has('alephEvidence'));}
   for(const row of observed)assert.ok(calls.some(c=>c.options.alephEvidence.caseId===row.attackId));
+  for(const row of observed){assert.match(row.observed,/^HTTP \d{3}$/);assert.equal(calls.filter(c=>c.options.alephEvidence.caseId===row.attackId).length,1);}
+  assert.equal(out.find(x=>x.attackId==='restore_route_requires_login').observed,'HTTP 401');
   for(const id of ['stage9_normal_detection','stage9_burst_detection','stage8_decider_path_policy','cross_owner_note_access','stage11_approved_browser'])assert.equal(out.find(x=>x.attackId===id).observed,'not_run');
  }finally{globalThis.fetch=original;}
 });

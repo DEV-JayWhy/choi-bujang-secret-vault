@@ -84,7 +84,7 @@ try {
   for (const attempt of attackAttempts) {
     // A synthetic detector result is not an HTTP response. Label only real
     // transport checks with the requested production host.
-    if (attempt.observed !== 'not_run' && !attempt.observed.startsWith('미') && !attempt.observed.startsWith('로컬 가상')) {
+    if (config.step < 12 && attempt.observed !== 'not_run' && !attempt.observed.startsWith('미') && !attempt.observed.startsWith('로컬 가상')) {
       attempt.observed = `[HTTP 점검 대상 ${checkTarget.hostname}] ${attempt.observed}`;
     }
   }
