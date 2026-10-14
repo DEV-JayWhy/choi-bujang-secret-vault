@@ -1,6 +1,6 @@
 # ALEPH BYTE BACK — 12단계 탈환 작전실
 
-현재 방어 단계는 **12**이며 보너스 **xdr-04 persistence**를 추가했습니다. 공개 Production은 https://choi-bujang-secret-vault-xi.vercel.app 이고 저장소는 https://github.com/DEV-JayWhy/choi-bujang-secret-vault 입니다. 현재 배포 커밋은 `GET /aleph.json`의 `commit`으로 확인합니다. 예전 단계별 작업 기록은 [보존한 이력](docs/history/stage1-to-stage10.md)에 있습니다. 이력의 과거 공개 API·단계 숫자는 현재 동작 설명이 아닙니다.
+현재 방어 단계는 **12**이며 보너스 **xdr-05 privilege**를 추가했습니다. 공개 Production은 https://choi-bujang-secret-vault-xi.vercel.app 이고 저장소는 https://github.com/DEV-JayWhy/choi-bujang-secret-vault 입니다. 현재 배포 커밋은 `GET /aleph.json`의 `commit`으로 확인합니다. 예전 단계별 작업 기록은 [보존한 이력](docs/history/stage1-to-stage10.md)에 있습니다. 이력의 과거 공개 API·단계 숫자는 현재 동작 설명이 아닙니다.
 
 ## 12단계 작전실 · 실제 결과와 미실행
 
@@ -78,6 +78,24 @@
 학생 자체 시험 결과는 **block 8 / alert 8 / record 8**, 일상 이벤트 8건의 block은 **0**입니다. 이는 시험 경보 내용 대조 결과이며 공식 심판 판정과 구분합니다. xdr-04 실제 심판은 저장점 작성 시 미실행입니다. 운영 DB 변경/시험은 이번 작업에서 실행하지 않습니다.
 
 출처: https://attack.mitre.org/techniques/T1543/ · https://attack.mitre.org/techniques/T1053/ · https://attack.mitre.org/techniques/T1547/001/ · 제공 `xdr/README.md`. 패턴/분류/adapter는 학생 구현, ALEPH SDP는 제공 엔진입니다.
+
+## 보너스 xdr-05 저장점 · 권한 가로채기
+
+원본 `xdr/fixtures/privilege.json` 26건과 기존 판정기·앱·API·DB 및 앞선 XDR 모듈을 보존합니다. 새 reader는 시각·출발 주소·가상 계정·규칙 수준·설명 다섯 항목만 추출하고 비밀값 의심 필드를 가립니다. 판단기는 reader를 불러오지 않습니다.
+
+`patterns.json`을 `decide.mjs` 맨 위 상수에 동일하게 옮겼습니다. 관리자 그룹 추가와 원격 주소/다계정 추가/즉시 명령 실행, 제거 직후 재추가, 방금 상승한 권한 또는 타인 권한의 명령 실행, 낯선 주소와 비정상 시각의 권한 사용 등 명확한 조합은 block(0.92~0.96)합니다. 취소·실패·그룹 조회·일반 그룹 변경·단발 관리자 명령의 불완전한 신호는 alert(0.55)이며 정상 로그인/관리 작업은 record(0.1)입니다. 경보 ID나 계정 이름으로 정답을 결정하지 않습니다. 시간/그룹 이름/높은 수준 하나만으로 차단하지 않습니다.
+
+근거는 MITRE ATT&CK T1068/T1078이며 그룹 변경에는 T1098을 추가로 명시합니다. 경보의 권한 상승만으로 소프트웨어 취약점 악용 성공이라고 단정하지 않습니다. `decide.mjs`는 다른 파일·패키지를 불러오거나 파일·네트워크 I/O를 하지 않는 독립 함수입니다.
+
+서버 전용 `respond.mjs`는 신뢰할 수 있는 서버의 `resolveVerifiedRequest` 연결이 있을 때만 block 대상의 엔진 검증 반/프로젝트/주체 범위에 15분 접속 거부 규칙을 만듭니다. 같은 주체의 새 요청/다른 기기 요청은 거부하고 다른 주체/프로젝트는 기존 판정 결과를 유지합니다. 기존 deny·step_up를 allow로 바꾸지 않으며 기존 판정기 규칙과 RULE_IDS는 수정하지 않습니다. 근거 경보 번호·만료 시각·고정 판단 결과만 로그에 쓰고 원본 계정·IP·그룹·본문·토큰은 제외합니다.
+
+**실제 세션 회수 한계:** 공식 요청 계약에는 세션 ID/토큰 회수 API가 없습니다. 이 부품은 주체 범위의 임시 접근 거부이며 Supabase 토큰을 폐기한 것으로 주장하지 않습니다. 기본 실행은 신뢰할 수 있는 연결이 없어 차단 후보 알림만 기록합니다. 제공 ALEPH 엔진의 실제 주체 연결/운영 세션 회수는 미실행입니다. 프로세스 내 규칙은 재시작 시 소멸합니다.
+
+재현: `node xdr/privilege/read-alerts.mjs` → 26줄, `npm run xdr:run -- privilege` → `xdr/privilege/result.json`, `node --test test/privilege.test.mjs` → 독립 sandbox/분류/가림/추가 거부/정상 요청/만료, `node --test test/*.test.mjs` → 기존 회귀. 알림 실행은 `node xdr/privilege/respond.mjs`; 로그는 커밋하지 않습니다. Node.js 22 이상에서 `npm install`로 설치합니다.
+
+학생 자체 시험 결과: **block 9 / alert 8 / record 9**, 정상 이벤트 9건의 block **0**. 공식 심판은 사용자가 직접 제출하며 이 저장점 작성 시 미실행입니다. 앞선 xdr-04도 실제 판정 결과를 아직 받지 않아 통과로 기록하지 않습니다. 이번 작업은 운영 DB 변경·시험을 하지 않습니다.
+
+출처: https://attack.mitre.org/techniques/T1068/ · https://attack.mitre.org/techniques/T1078/ · https://attack.mitre.org/techniques/T1098/ · 제공 `xdr/README.md`. 판단/접속 거부 부품은 학생 구현, ALEPH SDP는 제공 엔진입니다.
 
 ## 최종 10단계 기준점과 11단계 준비
 
