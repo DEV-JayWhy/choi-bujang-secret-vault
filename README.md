@@ -1,6 +1,6 @@
 # ALEPH BYTE BACK — 12단계 탈환 작전실
 
-현재 방어 단계는 **12**이며 보너스 **xdr-05 privilege**를 추가했습니다. 공개 Production은 https://choi-bujang-secret-vault-xi.vercel.app 이고 저장소는 https://github.com/DEV-JayWhy/choi-bujang-secret-vault 입니다. 현재 배포 커밋은 `GET /aleph.json`의 `commit`으로 확인합니다. 예전 단계별 작업 기록은 [보존한 이력](docs/history/stage1-to-stage10.md)에 있습니다. 이력의 과거 공개 API·단계 숫자는 현재 동작 설명이 아닙니다.
+현재 방어 단계는 **12**이며 보너스 **xdr-06 exfiltration**를 추가했습니다. 공개 Production은 https://choi-bujang-secret-vault-xi.vercel.app 이고 저장소는 https://github.com/DEV-JayWhy/choi-bujang-secret-vault 입니다. 현재 배포 커밋은 `GET /aleph.json`의 `commit`으로 확인합니다. 예전 단계별 작업 기록은 [보존한 이력](docs/history/stage1-to-stage10.md)에 있습니다. 이력의 과거 공개 API·단계 숫자는 현재 동작 설명이 아닙니다.
 
 ## 12단계 작전실 · 실제 결과와 미실행
 
@@ -96,6 +96,24 @@
 학생 자체 시험 결과: **block 9 / alert 8 / record 9**, 정상 이벤트 9건의 block **0**. 공식 심판은 사용자가 직접 제출하며 이 저장점 작성 시 미실행입니다. 앞선 xdr-04도 실제 판정 결과를 아직 받지 않아 통과로 기록하지 않습니다. 이번 작업은 운영 DB 변경·시험을 하지 않습니다.
 
 출처: https://attack.mitre.org/techniques/T1068/ · https://attack.mitre.org/techniques/T1078/ · https://attack.mitre.org/techniques/T1098/ · 제공 `xdr/README.md`. 판단/접속 거부 부품은 학생 구현, ALEPH SDP는 제공 엔진입니다.
+
+## 보너스 xdr-06 저장점 · 자료 빼돌리기
+
+원본 `xdr/fixtures/exfiltration.json` 30건과 기존 판정기·자료실·API·DB 및 앞선 XDR 모듈은 보존합니다. 새 reader는 시각·출발 주소·가상 계정·규칙 수준·설명만 추출하며 비밀값 의심 필드는 가립니다. 목적지·전송량·원본 전체를 출력하지 않습니다. 판단기는 reader를 불러오지 않습니다.
+
+`patterns.json`의 네 패턴은 `decide.mjs` 맨 위 동일 상수입니다. 유효 목적지로 50,000,000 bytes 이상 전송에 낯선 목적지, 비정상 시각의 압축/반복 반출, 다른 포트의 여러 자료, 짧은 시간 전체 외부 복사, 또는 명시적 대용량 5회 이상 반복이 함께 있으면 block(0.92~0.96)합니다. 작은/중간 전송·압축 생성만 확인·단발 변화·실패 경보는 alert(0.55), 평소 소량 조회/동기화는 record(0.1)입니다. 전송량/목적지/시각/규칙 수준 하나만으로 block하지 않습니다. 잘못된 수치·주소는 강한 신호로 사용하지 않습니다.
+
+MITRE ATT&CK T1041/T1048을 근거로 삼으며 50MB/5회는 제공 fixture를 위한 **학생 학습 기준**입니다. ATT&CK 공식 임계값, 실제 업무 평균/허용 목록, 실제 C2 통로나 유출 성공을 확인한 것으로 주장하지 않습니다. 시각과 목적지의 새로움은 경보에 명시된 근거만 읽습니다. 경보 ID·계정·IP를 정답표로 사용하지 않습니다. `decide.mjs`는 import·파일·네트워크 I/O 없는 독립 함수입니다.
+
+서버 전용 `respond.mjs`의 `createResponder({resolveVerifiedRequest, resolveRequestDestination})`는 서버 경보를 엔진 검증 요청과 연결하고, 실제 요청 목적지를 신뢰할 수 있는 서버가 확인한 경우에만 해당 반/프로젝트/목적지 IPv4 범위에 15분 거부 규칙을 적용합니다. 경보의 출발 IP로 신원을 만들지 않고 브라우저의 목적지 주장도 읽지 않습니다. 공식 18필드 요청에 목적지 필드를 추가하지 않습니다. 같은 프로젝트에서 대상 목적지 요청은 거부하고 다른 목적지/프로젝트와 기존 deny/step_up는 보존합니다. 근거 경보 번호와 만료 시각을 기록하되 원본 주소·계정·전송량·자료·토큰은 로그에 쓰지 않습니다.
+
+**집행 한계:** 기본 실행에는 두 신뢰 연결이 없어 block은 차단 후보 알림만 기록합니다. 제공 ALEPH 엔진의 실제 목적지 확인/운영 egress 차단은 미실행이며 로컬 adapter 검증과 구분합니다. IPv4를 대상으로 하며 프로세스 내 규칙은 재시작 시 소멸합니다. 운영 네트워크 방화벽이나 DB를 수정하지 않습니다.
+
+재현: `node xdr/exfiltration/read-alerts.mjs` → 30줄, `npm run xdr:run -- exfiltration` → `xdr/exfiltration/result.json`, `node --test test/exfiltration.test.mjs` → 독립 sandbox/분류/가림/목적지 거부/정상 요청/만료, `node --test test/*.test.mjs` → 기존 회귀. 알림 실행: `node xdr/exfiltration/respond.mjs`; 로그는 커밋하지 않습니다. Node.js 22 이상에서 `npm install`로 설치합니다.
+
+학생 자체 시험 결과: **block 10 / alert 10 / record 10**, 정상 이벤트 10건의 block **0**. 첫 분류의 대용량 반복 한 건이 알림이어서 해당 근거 조합만 추가했습니다. 공식 심판은 사용자가 직접 제출하며 저장점 작성 시 미실행입니다. xdr-04/05의 실제 판정도 아직 받지 않아 성공으로 기록하지 않습니다.
+
+출처: https://attack.mitre.org/techniques/T1041/ · https://attack.mitre.org/techniques/T1048/ · 제공 `xdr/README.md`. 탐지/목적지 거부 부품은 학생 구현, ALEPH SDP는 제공 엔진입니다.
 
 ## 최종 10단계 기준점과 11단계 준비
 
