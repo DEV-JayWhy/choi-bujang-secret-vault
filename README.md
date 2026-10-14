@@ -1,6 +1,6 @@
 # ALEPH BYTE BACK — 12단계 탈환 작전실
 
-현재 방어 단계는 **12**이며 보너스 **xdr-03 known-cve**를 추가했습니다. 공개 Production은 https://choi-bujang-secret-vault-xi.vercel.app 이고 저장소는 https://github.com/DEV-JayWhy/choi-bujang-secret-vault 입니다. 현재 배포 커밋은 `GET /aleph.json`의 `commit`으로 확인합니다. 예전 단계별 작업 기록은 [보존한 이력](docs/history/stage1-to-stage10.md)에 있습니다. 이력의 과거 공개 API·단계 숫자는 현재 동작 설명이 아닙니다.
+현재 방어 단계는 **12**이며 보너스 **xdr-04 persistence**를 추가했습니다. 공개 Production은 https://choi-bujang-secret-vault-xi.vercel.app 이고 저장소는 https://github.com/DEV-JayWhy/choi-bujang-secret-vault 입니다. 현재 배포 커밋은 `GET /aleph.json`의 `commit`으로 확인합니다. 예전 단계별 작업 기록은 [보존한 이력](docs/history/stage1-to-stage10.md)에 있습니다. 이력의 과거 공개 API·단계 숫자는 현재 동작 설명이 아닙니다.
 
 ## 12단계 작전실 · 실제 결과와 미실행
 
@@ -59,9 +59,25 @@
 
 재현: `node xdr/known-cve/read-alerts.mjs` → 24줄, `npm run xdr:run -- known-cve` → `xdr/known-cve/result.json`, `node --test test/known-cve.test.mjs` → 독립 sandbox·분류·비밀값 가림·추가 거부 및 정상 허용·만료 시험, `node --test test/*.test.mjs` → 기존 회귀. 알림 기록은 `node xdr/known-cve/respond.mjs`; `xdr/alerts.log`는 커밋하지 않습니다.
 
-로컬 시험 경보 결과는 **block 8 / alert 8 / record 8**, 일상 이벤트 8건의 block은 **0**입니다. 원본에 정답표가 없으므로 이는 경보 내용을 대조한 학생 자체 시험 결과이며 공식 심판 판정과 구분합니다. 보너스 실제 심판은 이번 저장점 작성 시 미실행입니다.
+로컬 시험 경보 결과는 **block 8 / alert 8 / record 8**, 일상 이벤트 8건의 block은 **0**입니다. 원본에 정답표가 없으므로 이는 경보 내용을 대조한 학생 자체 시험 결과이며 공식 심판 판정과 구분합니다. xdr-03 실제 심판은 `ef0a5cefce1d56a48547f55a8d3fd7b740958871`에서 조건 4개·가점 3개 모두 확인, 완성도 100/100 및 작전 점수 120점을 받았습니다. 저장점 작성 이후의 확정 판정입니다.
 
 출처: https://logging.apache.org/security.html#cve-2021-44228 · https://attack.mitre.org/techniques/T1190/ · 제공 `xdr/README.md`. 패턴·분류·adapter는 학생 구현이며 ALEPH SDP 엔진은 제공 엔진입니다.
+
+## 보너스 xdr-04 저장점 · 몰래 심어진 프로그램
+
+원본 `xdr/fixtures/persistence.json` 24건, 기존 `src/decider.mjs` 규칙과 1~12단계 API/DB, 앞선 XDR 모듈은 보존합니다. 새 `xdr/persistence/`의 reader는 시각·출발 주소·가상 계정·규칙 수준·설명만 추출하고 비밀값 의심 필드를 가립니다. 원본 전체나 파일 경로를 출력하지 않습니다.
+
+`patterns.json`의 네 패턴을 `decide.mjs` 맨 위에 동일하게 옮겼습니다. 명시적 서명 부재와 새 서비스/실행 파일 변경에 임시 실행 경로·원격 반복 등록 같은 근거가 함께 있는 경우, 낯선 예약 작업과 임시 실행 파일의 조합, 평소 목록에 없는 시작 폴더 프로그램 추가 등을 block(0.92~0.96)합니다. 서명 미확인·설명만 변경·임시 파일 하나·불완전한 시작 항목 변경은 alert(0.55)이며 일상 이벤트는 record(0.1)입니다. 경보 ID·계정·IP를 정답 또는 신원으로 사용하지 않습니다. 실제 PC의 평소 목록/서명 검사를 수행한 것으로 주장하지 않으며 경보에 명시된 정보만 사용합니다.
+
+근거는 MITRE ATT&CK T1543/T1053이며, 시작 폴더는 정확한 추가 근거인 T1547.001을 명시합니다. 제공 경보의 기존 기법 표기는 바꾸지 않습니다. `decide.mjs`는 import·파일·네트워크 I/O 없는 단독 판단 파일이고 `read-alerts.mjs`를 불러오지 않습니다.
+
+`respond.mjs`의 서버 전용 `createResponder({resolveVerifiedRequest})`는 신뢰할 수 있는 서버가 경보와 엔진 검증 요청을 연결한 경우에만 해당 반/프로젝트/기기 범위의 15분 격리 규칙을 생성합니다. 같은 기기의 새 요청도 격리하며 다른 기기/프로젝트의 정상 요청은 보존합니다. 근거 경보 번호·만료 시각을 기록하고 기존 판정기의 거부·재인증 요구를 허용으로 바꾸지 않습니다. 원본 계정·IP·경로·본문·토큰을 로그에 쓰지 않습니다. 기본 연결은 없으므로 차단 후보 알림만 기록합니다. **제공 ALEPH 엔진의 실제 기기 대응 연결·운영 격리는 미실행**입니다. 프로세스 내 규칙은 재시작하면 소멸합니다.
+
+재현: `node xdr/persistence/read-alerts.mjs` → 24줄, `npm run xdr:run -- persistence` → `xdr/persistence/result.json`, `node --test test/persistence.test.mjs` → 독립 sandbox·분류·비밀값 가림·기기 격리/정상 허용/만료, `node --test test/*.test.mjs` → 기존 회귀. 알림 기록: `node xdr/persistence/respond.mjs` (`xdr/alerts.log`는 제외). 설치는 Node.js 22 이상에서 `npm install`입니다.
+
+학생 자체 시험 결과는 **block 8 / alert 8 / record 8**, 일상 이벤트 8건의 block은 **0**입니다. 이는 시험 경보 내용 대조 결과이며 공식 심판 판정과 구분합니다. xdr-04 실제 심판은 저장점 작성 시 미실행입니다. 운영 DB 변경/시험은 이번 작업에서 실행하지 않습니다.
+
+출처: https://attack.mitre.org/techniques/T1543/ · https://attack.mitre.org/techniques/T1053/ · https://attack.mitre.org/techniques/T1547/001/ · 제공 `xdr/README.md`. 패턴/분류/adapter는 학생 구현, ALEPH SDP는 제공 엔진입니다.
 
 ## 최종 10단계 기준점과 11단계 준비
 

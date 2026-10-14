@@ -1,0 +1,35 @@
+{
+  "techniques": [
+    "T1543",
+    "T1053",
+    "T1547.001"
+  ],
+  "sources": [
+    "https://attack.mitre.org/techniques/T1543/",
+    "https://attack.mitre.org/techniques/T1053/",
+    "https://attack.mitre.org/techniques/T1547/001/"
+  ],
+  "thresholdNote": "과제 기준 0.85 이상 block, 0.5 이상 alert. 평소 목록·서명·변경 상태는 경보가 명시한 근거만 사용하며 실제 PC 목록이나 실행 성공을 추정하지 않는다.",
+  "patterns": [
+    {
+      "name": "unsigned_service_change",
+      "condition": "서명 없음이 명시된 서비스 생성·실행 파일 변경에 임시 실행 경로, 원격 반복 등록 또는 실행 파일 변경 근거가 함께 있으면 block한다. 서명 미확인은 alert만 한다.",
+      "evidence": "MITRE ATT&CK T1543 및 T1543.003: 새 서비스나 기존 서비스 실행 설정 변경을 통한 지속성. 단일 서명 부재만으로 악성 확정하지 않는다."
+    },
+    {
+      "name": "unfamiliar_scheduled_task",
+      "condition": "낯선/임의 이름 예약 작업이 임시 실행 파일을 가리키거나 시작 프로그램과 동일 임시 파일을 함께 가리키면 block한다. 평소 시각·수업 작업의 불확실한 변경은 alert만 한다.",
+      "evidence": "MITRE ATT&CK T1053 및 T1053.005: 예약 작업으로 프로그램 반복 실행. 임시 경로와 이름·동일 파일의 조합은 학생 탐지 기준이다."
+    },
+    {
+      "name": "unlisted_startup_entry",
+      "condition": "평소 목록에 없다는 경보와 Startup 실행 파일 추가, 또는 미등록 서비스의 임시 실행 파일·재시작 지속성 근거가 함께 있을 때 block한다. 시작 폴더 변경 하나만으로 차단하지 않는다.",
+      "evidence": "MITRE ATT&CK T1547.001은 시작 폴더 자동 실행, T1543은 서비스 지속성을 설명한다. 제공 경보의 시작 폴더 T1543 표기는 보존하고 정확한 근거를 별도 명시한다."
+    },
+    {
+      "name": "uncertain_persistence_change",
+      "condition": "서비스·예약 작업·시작 항목 관련 T1543/T1053/T1547 경보(level 5 이상) 또는 불완전한 변경 신호는 alert한다. 평소 목록 유지·정상 서명 서비스 실행·일상 이벤트는 record한다.",
+      "evidence": "제공 Wazuh 경보의 변경/미확인 신호를 조사 대상으로 삼는다. 수준·0.55 점수는 학생 기준이며 ATT&CK 공식 임계값이 아니다."
+    }
+  ]
+}
