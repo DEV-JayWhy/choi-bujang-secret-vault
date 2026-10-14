@@ -1,0 +1,31 @@
+{
+  "cve": "CVE-2021-44228",
+  "technique": "T1190",
+  "sources": [
+    "https://logging.apache.org/security.html#cve-2021-44228",
+    "https://attack.mitre.org/techniques/T1190/"
+  ],
+  "thresholdNote": "0.85/0.5는 과제 행동 기준. 실제 취약 버전·침입 성공·패치 여부는 이 경보만으로 확정하지 않는다.",
+  "patterns": [
+    {
+      "name": "remote_jndi_lookup",
+      "condition": "요청 머리글·URL·인자에서 완전한 ${jndi:<원격 프로토콜>://<대상>} 구문을 확인한다. 단어·설명·규칙 수준만으로 차단하지 않는다.",
+      "evidence": "Apache CVE-2021-44228 설명: 공격자가 제어한 로그·인자의 JNDI 원격 endpoint 조회 악용. MITRE ATT&CK T1190."
+    },
+    {
+      "name": "incomplete_jndi_lookup",
+      "condition": "요청 값에 시작된 jndi 조회 구문이 있으나 완전한 원격 조회가 확인되지 않으면 알림만 한다.",
+      "evidence": "CVE-2021-44228 조회 신호의 일부만 있으므로 실행 가능한 악용이라고 확정하지 않는다."
+    },
+    {
+      "name": "cve_scanner_trace",
+      "condition": "요청 user-agent의 log4j/log4shell 점검 도구 이름은 알림 신호로만 사용한다.",
+      "evidence": "MITRE ATT&CK T1190의 공개 애플리케이션 악용 탐지 맥락. 점검 도구 사용만으로 공격 성공·악의를 확정하지 않는다."
+    },
+    {
+      "name": "weak_cve_rule_signal",
+      "condition": "요청 맥락에 T1190과 level 5 이상 Wazuh 경보가 함께 있으면 약한 신호로 알림한다. 취약점 이름·문서·수업 흔적을 차단하지 않는다.",
+      "evidence": "제공 known-cve Wazuh 경보의 불완전한 취약점 신호. 수준과 0.55 점수는 학생 기준이며 MITRE 공식 임계값이 아니다."
+    }
+  ]
+}

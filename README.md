@@ -1,6 +1,6 @@
 # ALEPH BYTE BACK — 12단계 탈환 작전실
 
-현재 후보 단계는 **12**입니다. 공개 Production은 https://choi-bujang-secret-vault-xi.vercel.app 이고 저장소는 https://github.com/DEV-JayWhy/choi-bujang-secret-vault 입니다. 현재 배포 커밋은 `GET /aleph.json`의 `commit`으로 확인합니다. 예전 단계별 작업 기록은 [보존한 이력](docs/history/stage1-to-stage10.md)에 있습니다. 이력의 과거 공개 API·단계 숫자는 현재 동작 설명이 아닙니다.
+현재 방어 단계는 **12**이며 보너스 **xdr-03 known-cve**를 추가했습니다. 공개 Production은 https://choi-bujang-secret-vault-xi.vercel.app 이고 저장소는 https://github.com/DEV-JayWhy/choi-bujang-secret-vault 입니다. 현재 배포 커밋은 `GET /aleph.json`의 `commit`으로 확인합니다. 예전 단계별 작업 기록은 [보존한 이력](docs/history/stage1-to-stage10.md)에 있습니다. 이력의 과거 공개 API·단계 숫자는 현재 동작 설명이 아닙니다.
 
 ## 12단계 작전실 · 실제 결과와 미실행
 
@@ -45,7 +45,23 @@
 | 제공 엔진 | **ALEPH SDP 엔진**. 엔진이 제공하는 신원·기기·경로 확인, 판정 집행, 서명 검사와 회수 상태·공식 총공세는 학생 로컬 fixture와 구분 |
 | 기반 서비스 | Supabase Auth·Postgres 및 Vercel. 서비스 비밀값은 운영 설정에만 유지 |
 
-12단계의 실제 심판 결과는 아직 미확인입니다. 클라우드 Google 로그인 연결이 502/Connection refused로 실패했으며 이를 제출 성공으로 기록하지 않습니다.
+12단계 최종 실제 심판은 `de802c6adb06b5c2b7fdc8dc4168e6c3a2d4a460`에서 100/100점입니다. 클라우드 상황실에서 누적 1,200/1,200점 및 괴물 41/41종을 확인했습니다. 앞의 53점과 로그인 502는 과정 기록이며 최종 상태가 아닙니다. 이 통과본은 보너스 작업의 보존 기준점입니다.
+
+## 보너스 xdr-03 저장점 · 알려진 취약점
+
+기존 판정기 `src/decider.mjs`와 1~12단계 앱/API/DB는 수정하지 않습니다. 원본 `xdr/fixtures/known-cve.json` 24건도 보존합니다. `xdr/known-cve/read-alerts.mjs`는 시각·출발 주소·가상 계정·규칙 수준·설명 다섯 항목만 읽고 비밀값 의심 필드는 가립니다. 판단 모듈은 이 읽기 모듈을 불러오지 않습니다.
+
+`patterns.json`의 이름·조건·근거를 `decide.mjs` 맨 위 상수로 동일하게 옮겼습니다. Apache CVE-2021-44228 설명 및 MITRE ATT&CK T1190을 근거로 요청 값의 완전한 원격 JNDI 조회를 block(0.96), 불완전한 구문·점검 도구 흔적·약한 Wazuh 취약점 신호를 alert(0.55~0.7), 신호 없는 일상 이벤트를 record(0.1)로 판단합니다. CVE/jndi 단어만으로 차단하지 않습니다. 경보 ID를 정답으로 쓰지 않습니다. `decide.mjs`는 import·파일/네트워크 I/O 없이 단독 계산합니다. 악용 성공·영향받는 설치 버전·패치 완료는 이 결과로 주장하지 않습니다.
+
+**차단 연결:** `respond.mjs`의 `createResponder({resolveVerifiedRequest})`가 서버 측 경보와 엔진 검증 요청을 연결하는 콜백을 받습니다. block만 해당 요청 범위의 15분 거부 규칙을 생성하며 근거 경보 번호와 만료 시각을 붙입니다. `decideRequest(request)`는 기존 판정기를 먼저 호출하고 기존 deny를 유지하며, 해당 추가 규칙이 있을 때만 deny를 더합니다. 기존 규칙 파일이나 RULE_IDS는 변경하지 않습니다. 다른 정상 요청·미등록 기기 거부·규칙 만료를 로컬 합성 요청으로 재시험했습니다.
+
+출발 IP·계정만으로 검증된 신원을 만들지 않습니다. 콜백은 브라우저 입력을 받아 구현하면 안 됩니다. 기본 실행은 검증된 요청 연결이 없으므로 block을 차단 후보 알림으로 기록하고 실제 규칙을 등록하지 않습니다. **제공 ALEPH 엔진의 실제 사건-요청 연결과 운영 집행은 미연결/미실행**이며 로컬 adapter 시험과 구분합니다. 프로세스 내 규칙은 재시작 시 소멸합니다. 로그는 고정 패턴·행동·검증한 경보 번호·시각만 남기고 원본 요청·본문·토큰·IP·계정은 넣지 않습니다.
+
+재현: `node xdr/known-cve/read-alerts.mjs` → 24줄, `npm run xdr:run -- known-cve` → `xdr/known-cve/result.json`, `node --test test/known-cve.test.mjs` → 독립 sandbox·분류·비밀값 가림·추가 거부 및 정상 허용·만료 시험, `node --test test/*.test.mjs` → 기존 회귀. 알림 기록은 `node xdr/known-cve/respond.mjs`; `xdr/alerts.log`는 커밋하지 않습니다.
+
+로컬 시험 경보 결과는 **block 8 / alert 8 / record 8**, 일상 이벤트 8건의 block은 **0**입니다. 원본에 정답표가 없으므로 이는 경보 내용을 대조한 학생 자체 시험 결과이며 공식 심판 판정과 구분합니다. 보너스 실제 심판은 이번 저장점 작성 시 미실행입니다.
+
+출처: https://logging.apache.org/security.html#cve-2021-44228 · https://attack.mitre.org/techniques/T1190/ · 제공 `xdr/README.md`. 패턴·분류·adapter는 학생 구현이며 ALEPH SDP 엔진은 제공 엔진입니다.
 
 ## 최종 10단계 기준점과 11단계 준비
 
