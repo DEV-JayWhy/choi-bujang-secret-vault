@@ -44,3 +44,24 @@ test('stage 8 self-check sends only GET and labels skipped writes; stage 7 prese
     assert.equal(seven.length, 10);
   } finally { globalThis.fetch = original; }
 });
+
+test('stage 12 binds every actual HTTP result to its attackId and uses exact not_run for non-HTTP checks', async () => {
+ const original=globalThis.fetch;const calls=[];
+ globalThis.fetch=async(input,options={})=>{
+  calls.push({path:new URL(input).pathname,options});
+  const path=new URL(input).pathname;
+  const json=(data,status=200,headers={})=>new Response(JSON.stringify(data),{status,headers});
+  if(path==='/manifest.webmanifest')return json({name:'fixture',start_url:'/',icons:[]});
+  if(path==='/api/device/status')return json({approved:false},401);
+  if(path==='/api/checks')return json({schema:'aleph.operations.v1',commit:'a'.repeat(40),serverRecord:{status:'stored'},checks:[],counts:{allowed:2,denied:6,notRun:10},officialSuite:{executed:0,notRun:41}});
+  return json({},path==='/data.json'?404:401,{'X-Aleph-Recovery-Checkpoint':'auth_rejected'});
+ };
+ try{
+  const out=await runAttackChecks({step:12,publicAppUrl:'https://fixture.vercel.app',checkedCommit:'a'.repeat(40)});
+  assert.equal(out.length,20);const observed=out.filter(x=>x.observed!=='not_run');assert.equal(observed.length,8);
+  const ids=new Set(out.map(x=>x.attackId));
+  for(const {options} of calls){assert.ok(options.method===undefined||options.method==='GET');assert.equal(typeof options.alephEvidence?.caseId,'string');assert.ok(ids.has(options.alephEvidence.caseId));assert.ok(!new Headers(options.headers).has('alephEvidence'));}
+  for(const row of observed)assert.ok(calls.some(c=>c.options.alephEvidence.caseId===row.attackId));
+  for(const id of ['stage9_normal_detection','stage9_burst_detection','stage8_decider_path_policy','cross_owner_note_access','stage11_approved_browser'])assert.equal(out.find(x=>x.attackId===id).observed,'not_run');
+ }finally{globalThis.fetch=original;}
+});

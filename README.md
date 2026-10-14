@@ -20,6 +20,12 @@
 
 `npm run ops:check`는 현재 HEAD와 Production API의 커밋을 대조하고 `artifacts/operations-result.json`에 실제 응답을 저장합니다. 인증 토큰을 CLI로 옮기지 않습니다. 정상 보호 요청은 승인된 브라우저의 작전실에서 별도로 실행합니다. `npm run bundle`은 별도의 자기 점검과 미실행 범위를 포함하며 공식 심판 결과를 대신하지 않습니다.
 
+### 실제 1차 심판과 실행 기록 연결 수정
+
+12단계 1차 실제 심판은 f05b48f0a77f6f4afe408f966872899cbfa8ede3에서 53/100점, S12_SCREEN_MISMATCH입니다. 「실행 기록 대조」가 attackId에 해당하는 HTTP 요청 기록을 찾지 못했다고 밝혔습니다. 화면 수치와 실제 DB 기록은 별도로 일치했지만 이것이 심판 runner의 요청별 대조를 대신하지 않습니다.
+
+운영자 공개 표본 `ChoiTimo/byteback-sample-pass`의 src/attack-check.mjs에 근거해 실제 fetch에 `alephEvidence: {caseId, requestKey}`를 넣습니다. 이는 sandbox runner의 요청별 대조용 메타데이터이며 HTTP 헤더·URL·권한 값으로 보내지 않습니다. 요청을 보내지 않은 항목과 로컬 fixture는 이번 제출 묶음에서 observed를 정확히 `not_run`으로 남깁니다. 로컬 판정·탐지 연습 결과는 별도 테스트 로그로 보존합니다. 실제 HTTP 응답을 읽어 기록한 항목만 runner 요청 기록과 연결합니다.
+
 ## 설치·실행·중지·복구와 출처
 
 검사 커밋은 제출 JSON의 commit과 배포 `/aleph.json`의 commit이 같은 값이어야 합니다. 11단계 작동 기준점은 `529269c50a147446a53787e8a31a465ec3bc78f4`입니다.

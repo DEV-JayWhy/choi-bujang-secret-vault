@@ -1,5 +1,9 @@
 // Stage 10 final checkpoint: production HTTP checks include the dynamic recovery login gate.
 import { detect } from './detect.mjs';
+// Operator sample uses fetch-only metadata for sandbox evidence correlation.
+// This is not an HTTP header, URL parameter, identity, or access credential.
+const evidence = (config, caseId, requestKey = 'read') => config.step >= 12
+  ? { alephEvidence: { caseId, requestKey } } : {};
 
 // The student changes this check as each stage adds an attack to the same app.
 // Never return tokens, private keys, real names, or note bodies.
@@ -42,6 +46,7 @@ export async function runAttackChecks(config) {
     throw new Error('실제 배포 주소를 확인해 주세요.');
   }
   const missingId = '00000000-0000-4000-8000-000000000123';
+  const httpObserved = new Set();
   const cases = [
     ['anonymous_note_list', 'GET', '/api/notes'],
     ['anonymous_note_create', 'POST', '/api/notes'],
@@ -62,11 +67,13 @@ export async function runAttackChecks(config) {
     try {
       const response = await fetch(new URL(path, app), {
         method, redirect: 'error', signal: AbortSignal.timeout(10000),
+        ...evidence(config, attackId),
         headers: { ...(['POST', 'PUT'].includes(method) ? { 'Content-Type': 'application/json' } : {}),
           ...(invalidToken ? { Authorization: 'Bearer invalid' } : {}) },
         ...(['POST', 'PUT'].includes(method) ? { body: JSON.stringify({ title: 'self-check', body: '' }) } : {}),
       });
       const text = await response.text();
+      httpObserved.add(attackId);
       let hasNotes = false;
       try {
         const data = JSON.parse(text);
@@ -83,6 +90,7 @@ export async function runAttackChecks(config) {
           const signedProbe = await fetch(new URL(path, app), {
             method: 'GET', redirect: 'error',
             signal: AbortSignal.timeout(10000),
+            ...evidence(config, attackId, 'auth_probe'),
             headers: { Authorization: 'Bearer invalid' },
           });
           signedStatus = signedProbe.status;
@@ -174,7 +182,8 @@ export async function runAttackChecks(config) {
       ['stage11_unapproved_device', '/api/device/status', '로그인 없는 기기 조회는 401, approved는 true가 아님'],
     ]) {
       try {
-        const response = await fetch(new URL(path, app), { redirect: 'error', signal: AbortSignal.timeout(10000) });
+        const response = await fetch(new URL(path, app), { redirect: 'error', signal: AbortSignal.timeout(10000), ...evidence(config, attackId) });
+        httpObserved.add(attackId);
         let body; try { body = await response.json(); } catch { body = null; }
         const valid = attackId === 'stage11_manifest'
           ? response.status === 200 && typeof body?.name === 'string' && body.start_url === '/' && Array.isArray(body.icons)
@@ -190,8 +199,9 @@ export async function runAttackChecks(config) {
     const attackId = 'stage12_server_operations';
     const expected = '현재 커밋의 HTTP 200 작전실 기록, 실제 API 결과·미실행 구분, 공식 41종을 임의 통과 처리하지 않음';
     try {
-      const response = await fetch(new URL('/api/checks', app), { redirect: 'error', signal: AbortSignal.timeout(120000) });
+      const response = await fetch(new URL('/api/checks', app), { redirect: 'error', signal: AbortSignal.timeout(120000), ...evidence(config, attackId) });
       const report = await response.json();
+      httpObserved.add(attackId);
       const counts = report?.counts;
       const match = response.status === 200 && report.schema === 'aleph.operations.v1'
         && (!config.checkedCommit || report.commit === config.checkedCommit)
@@ -199,6 +209,12 @@ export async function runAttackChecks(config) {
         && report.officialSuite?.executed === 0 && report.officialSuite?.notRun === 41;
       results.push({ attackId, expected, observed: `HTTP ${response.status}; 정상 허용 ${counts?.allowed ?? '미확인'}; 금지 거부 ${counts?.denied ?? '미확인'}; 미실행 ${counts?.notRun ?? '미확인'}; 기대 조건 ${match ? '일치' : '불일치'}` });
     } catch { results.push({ attackId, expected, observed: '미확인: 작전실 HTTP 조회 실패; 공식 총공세를 실행했다고 기록하지 않음' }); }
+  }
+  if (config.step >= 12) {
+    // Local fixtures and skipped requests are not HTTP evidence. Preserve their
+    // separate test commands; the current submission uses the exact sentinel.
+    for (const item of results) if (!httpObserved.has(item.attackId)
+        || !/^(?:HTTP|익명 HTTP) /.test(item.observed)) item.observed = 'not_run';
   }
   return results;
 }
