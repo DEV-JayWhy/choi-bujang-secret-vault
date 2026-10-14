@@ -1,6 +1,43 @@
-# ALEPH BYTE BACK — 11단계 접속 앱과 서버 승인 확인
+# ALEPH BYTE BACK — 12단계 탈환 작전실
 
-현재 후보 단계는 **11**입니다. 공개 Production은 https://choi-bujang-secret-vault-xi.vercel.app 이고 저장소는 https://github.com/DEV-JayWhy/choi-bujang-secret-vault 입니다. 현재 배포 커밋은 `GET /aleph.json`의 `commit`으로 확인합니다. 예전 단계별 작업 기록은 [보존한 이력](docs/history/stage1-to-stage10.md)에 있습니다. 이력의 과거 공개 API·단계 숫자는 현재 동작 설명이 아닙니다.
+현재 후보 단계는 **12**입니다. 공개 Production은 https://choi-bujang-secret-vault-xi.vercel.app 이고 저장소는 https://github.com/DEV-JayWhy/choi-bujang-secret-vault 입니다. 현재 배포 커밋은 `GET /aleph.json`의 `commit`으로 확인합니다. 예전 단계별 작업 기록은 [보존한 이력](docs/history/stage1-to-stage10.md)에 있습니다. 이력의 과거 공개 API·단계 숫자는 현재 동작 설명이 아닙니다.
+
+## 12단계 작전실 · 실제 결과와 미실행
+
+`/operations.html`에서 「읽기 전용 API 점검 실행」을 누릅니다. `/api/checks`는 지정된 Production에 실제 GET 요청을 보내고 요청 ID·ID 출처·확인 시각·HTTP 상태·정상/금지 구분을 반환합니다. 메모 응답은 구조만 검사한 뒤 폐기하며 본문·제목·사용자 ID·토큰을 JSON에 넣지 않습니다. 확인 실패를 통과로 바꾸지 않습니다. 검사 당시 배포 SHA와 요청 대상 SHA가 다르면 일치로 기록하지 않습니다.
+
+화면의 수치는 API의 checks로 계산한 counts입니다. 동일한 가린 JSON을 새 `a12_operations_runs`에 INSERT하고 저장 성공 여부를 반환합니다. 화면에서 JSON을 내려받아 실행 ID로 DB 기록과 대조할 수 있습니다. 테이블은 RLS 및 server 역할의 SELECT·INSERT만 사용하며 UPDATE·DELETE를 허용하지 않습니다. 기존 메모·백업·감사는 보존합니다.
+
+| 표시 | 근거와 한계 |
+|---|---|
+| 판정기 규칙 | 현재 `RULE_IDS` 모듈의 목록. 실제 판정 성공 건수로 쓰지 않음 |
+| 탐지 사건 | 실제 엔진 사건 전달 기록 미연결 → 미실행 |
+| 회수 상태 | 실제 엔진 집행·재요청 기록 미연결 → 미실행 |
+| 복구 버전 | 검증된 사용자·기기 컨텍스트가 있는 경우, 해당 소유자 범위의 DB 감사 최신 20개와 검증 preview 사본 버전만 읽음. 이번 점검의 복원/전체 재시험 성공으로 확대하지 않음 |
+| 정상 요청 | 공개 배포 식별자·manifest의 HTTP 200을 실측. 보호 목록은 검증된 인증과 승인 컨텍스트에서만 시험하고, 없으면 미실행 |
+| 금지 요청 | 무인증 목록·상세·복원·기기 상태 및 위조 토큰의 실제 GET 응답 |
+| 공식 41종 총공세 | 이번 커밋의 공식 전체 영수증 미연결 → 실행 0·미실행 41. 과거 단계 통과와 로컬 연습을 합산하지 않음 |
+
+`npm run ops:check`는 현재 HEAD와 Production API의 커밋을 대조하고 `artifacts/operations-result.json`에 실제 응답을 저장합니다. 인증 토큰을 CLI로 옮기지 않습니다. 정상 보호 요청은 승인된 브라우저의 작전실에서 별도로 실행합니다. `npm run bundle`은 별도의 자기 점검과 미실행 범위를 포함하며 공식 심판 결과를 대신하지 않습니다.
+
+## 설치·실행·중지·복구와 출처
+
+검사 커밋은 제출 JSON의 commit과 배포 `/aleph.json`의 commit이 같은 값이어야 합니다. 11단계 작동 기준점은 `529269c50a147446a53787e8a31a465ec3bc78f4`입니다.
+
+1. 설치: `git clone https://github.com/DEV-JayWhy/choi-bujang-secret-vault.git`, 폴더로 이동한 뒤 `git checkout <검사한-커밋>`, `npm install`. Node.js 22 이상을 사용하고 lockfile의 패키지 버전을 유지합니다.
+2. 로컬 검사: `node --test test/*.test.mjs`, `npm run decider:test`, `npm run detect:test`, `npm run build -- --local`. 이 명령은 로컬 시험이며 실제 엔진 회수·심판 판정을 증명하지 않습니다.
+3. 실행: 기존 Vercel 프로젝트와 같은 저장소를 배포하고 기존 서버 전용 Supabase 설정을 유지합니다. 새 운영 기록 테이블 SQL은 검토한 `sql/12_operations_runs.sql`만 추가 적용합니다. 개인키·환경변수 파일을 포장하거나 Git에 넣지 않습니다. Production READY와 `/aleph.json` SHA를 확인합니다.
+4. 재현: 자료실의 작전실 링크 → 읽기 전용 점검 → 표의 정상/금지 요청과 요청 ID·시각 확인 → 가린 JSON 다운로드 → 서버의 동일 run_id 기록과 비교 → `npm run ops:check` → `npm run bundle`. 정상 보호 요청이 미실행이면 실제 승인된 사용자 컨텍스트에서 재실행합니다. 공식 총공세는 ALEPH 심판에 제출해 별도로 확인합니다.
+5. 중지: Vercel 관리 화면에서 이 프로젝트의 배포를 일시 중지하거나 제공 엔진의 해당 경로 허용을 끕니다. 원본 DB·백업·감사는 삭제하지 않습니다.
+6. 복구: 먼저 `git status`·`git diff`로 다른 작업을 보존합니다. Vercel에서 이전 작동 배포를 선택해 되돌리거나 별도 브랜치로 기준 커밋을 다시 배포합니다. `reset --hard`를 쓰지 않습니다. 새 기록 테이블과 기존 감사도 그대로 보존합니다. 복구 후 SHA·정상/금지 요청을 다시 시험하고 새 시각의 결과를 남깁니다.
+
+| 출처 | 범위 |
+|---|---|
+| 학생 구현 | 판정기 `src/decider.mjs`, 탐지기 `src/detect.mjs`, 접속 앱 `public/`, 자료실·복원 API, 자기 점검, 이번 작전실·가린 결과 기록 |
+| 제공 엔진 | **ALEPH SDP 엔진**. 엔진이 제공하는 신원·기기·경로 확인, 판정 집행, 서명 검사와 회수 상태·공식 총공세는 학생 로컬 fixture와 구분 |
+| 기반 서비스 | Supabase Auth·Postgres 및 Vercel. 서비스 비밀값은 운영 설정에만 유지 |
+
+12단계의 실제 심판 결과는 아직 미확인입니다. 클라우드 Google 로그인 연결이 502/Connection refused로 실패했으며 이를 제출 성공으로 기록하지 않습니다.
 
 ## 최종 10단계 기준점과 11단계 준비
 
@@ -19,7 +56,7 @@
 
 이 서버 상태 API는 운영자 공개 표본의 `approved` 결과 표시 구조를 참고한 이 앱의 구현입니다. 제공 SDP 엔진의 미공개 서명 헤더나 기기 승인 계약을 임의로 만들어 공식 계약이라고 주장하지 않습니다. 1차 실제 심판 화면은 경로·본문 변경 공격을 격파로 표시했고, 앱 서명 없이 보호 요청 공격에서 화면 승인 조건 두 개가 실패했습니다.
 
-검증: 전체 로컬 테스트 102/102, 승인 전 화면 차단·승인 확인 뒤 기존 화면·재확인 실패/오프라인 자료 비움·요청의 승인 불가·소유자/만료 대조 시험 통과. 실제 DB의 RLS·역할 권한 및 pending→운영 승인 상태를 격리 트랜잭션에서 검사하고 ROLLBACK했습니다. 실제 학생 계정의 승인 완료 브라우저 조회와 실제 심판 2차 결과는 아직 미확인입니다.
+검증: 전체 로컬 테스트 102/102, 승인 전 화면 차단·승인 확인 뒤 기존 화면·재확인 실패/오프라인 자료 비움·요청의 승인 불가·소유자/만료 대조 시험 통과. 실제 DB의 RLS·역할 권한 및 pending→운영 승인 상태를 격리 트랜잭션에서 검사하고 ROLLBACK했습니다. 11단계 2차 실제 심판은 `529269c50a147446a53787e8a31a465ec3bc78f4`에서 조건 6개·완결성 가점 3개를 모두 확인해 100/100점 통과했습니다. 실제 승인 완료 학생 브라우저의 별도 실사용 시험은 미실행으로 구분합니다.
 
 ## 제작 1·2: 안전 정책 검증·차이·시험 정책 복원
 
@@ -81,4 +118,4 @@
 
 `npm install`, `node --test test/*.test.mjs`, `npm run decider:test`, `npm run detect:test`, `npm run build -- --local` 순으로 로컬 검증합니다. 최신 진단 변경의 전체 로컬 테스트는 97/97 통과했습니다. 이는 심판 통과 증거가 아닙니다. 서버 비밀 설정은 Vercel 환경변수에서만 유지합니다. `npm run bundle`은 커밋된 저장소 상태와 실제 공개 배포에 대해 수행하며 인증된 B 복원 미실행 항목을 그대로 남깁니다.
 
-1~9단계 인증·소유권·기기·재인증·자원 경로 통제는 그대로 유지합니다. `src/decider.mjs`는 `docs/DECIDER_REQUEST.md`의 공식 필드만 읽고 등록된 RULE_IDS만 반환합니다. `aleph.config.json`의 step은 11입니다.
+1~9단계 인증·소유권·기기·재인증·자원 경로 통제는 그대로 유지합니다. `src/decider.mjs`는 `docs/DECIDER_REQUEST.md`의 공식 필드만 읽고 등록된 RULE_IDS만 반환합니다. `aleph.config.json`의 step은 12입니다.

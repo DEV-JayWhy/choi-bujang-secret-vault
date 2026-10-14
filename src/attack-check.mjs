@@ -36,7 +36,7 @@ async function runFirstStageChecks(config) {
 
 export async function runAttackChecks(config) {
   if (config.step === 1) return runFirstStageChecks(config);
-  if (![3, 4, 5, 6, 7, 8, 9, 10, 11].includes(config.step)) throw new Error('현재 자기 점검은 1·3·4·5·6·7·8·9·10·11단계에만 구현되어 있습니다.');
+  if (![3, 4, 5, 6, 7, 8, 9, 10, 11, 12].includes(config.step)) throw new Error('현재 자기 점검은 1·3·4·5·6·7·8·9·10·11·12단계에만 구현되어 있습니다.');
   const app = new URL(config.publicAppUrl);
   if (app.protocol !== 'https:' || app.username || app.password || app.search || app.hash || app.pathname !== '/') {
     throw new Error('실제 배포 주소를 확인해 주세요.');
@@ -99,7 +99,7 @@ export async function runAttackChecks(config) {
       return { attackId, expected, observed: '요청 실패 또는 시간 초과: HTTP 상태·자료 반환 여부 미확인' };
     }
   }));
-  if ([4, 5, 6, 7, 8, 9, 10, 11].includes(config.step)) results.push(
+  if ([4, 5, 6, 7, 8, 9, 10, 11, 12].includes(config.step)) results.push(
     { attackId: 'cross_owner_note_access', expected: '타인 메모 GET·PUT·DELETE는 자료 없이 404', observed: '미실행: 이 환경에서 실제 A/B 로그인 세션으로 재검증하지 않음; 사용자 B→A 404 보고와 구분' },
     { attackId: 'owner_change_rejected', expected: 'POST·PUT 본문 owner_id 변경 시도는 400으로 거부', observed: '미실행: 실제 배포의 인증된 소유자 변경 요청은 재검증하지 않음' },
     { attackId: 'database_rls_privileges', expected: config.step >= 5 ? '기존 소유자 RLS 유지, anon·authenticated 직접 권한 없음, service_role CRUD 유지' : '소유자 RLS 4개, anon 권한 없음, authenticated CRUD만 허용, service_role 유지', observed: '미실행: DB 관리자 연결 없이 독립 조회하지 않음; 사용자 적용·검증 보고와 구분' }
@@ -183,6 +183,22 @@ export async function runAttackChecks(config) {
       } catch { results.push({ attackId, expected, observed: '미확인: HTTP 요청 실패 또는 시간 초과' }); }
     }
     results.push({ attackId: 'stage11_approved_browser', expected: '서버가 승인한 기기에서 기존 자료실 조회·수정·복원 정상', observed: '미실행: 실제 승인 완료 사용자 브라우저의 자료실 실행은 별도 검증 필요; 로컬 승인 응답 모의 시험과 구분' });
+  }
+  if (config.step >= 12) {
+    const index = results.findIndex(item => item.attackId === 'stage9_revoked_identity_retry');
+    if (index >= 0) results.splice(index, 1);
+    const attackId = 'stage12_server_operations';
+    const expected = '현재 커밋의 HTTP 200 작전실 기록, 실제 API 결과·미실행 구분, 공식 41종을 임의 통과 처리하지 않음';
+    try {
+      const response = await fetch(new URL('/api/checks', app), { redirect: 'error', signal: AbortSignal.timeout(120000) });
+      const report = await response.json();
+      const counts = report?.counts;
+      const match = response.status === 200 && report.schema === 'aleph.operations.v1'
+        && (!config.checkedCommit || report.commit === config.checkedCommit)
+        && report.serverRecord?.status === 'stored' && Array.isArray(report.checks)
+        && report.officialSuite?.executed === 0 && report.officialSuite?.notRun === 41;
+      results.push({ attackId, expected, observed: `HTTP ${response.status}; 정상 허용 ${counts?.allowed ?? '미확인'}; 금지 거부 ${counts?.denied ?? '미확인'}; 미실행 ${counts?.notRun ?? '미확인'}; 기대 조건 ${match ? '일치' : '불일치'}` });
+    } catch { results.push({ attackId, expected, observed: '미확인: 작전실 HTTP 조회 실패; 공식 총공세를 실행했다고 기록하지 않음' }); }
   }
   return results;
 }

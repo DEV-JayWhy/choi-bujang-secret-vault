@@ -5,7 +5,7 @@ import { test } from 'node:test';
 
 const baseline = JSON.parse(await readFile(new URL('../package/baseline-functions.json', import.meta.url)));
 
-test('시작 틀의 패키징 기준을 보존하고 추가된 메모·복구 API를 확인한다', async () => {
+test('시작 틀의 패키징 기준을 보존하고 추가된 메모·복구·작전실 API를 확인한다', async () => {
   const actual = (await readdir(new URL('../api/', import.meta.url)))
     .filter(name => /\.(?:m?js|ts)$/u.test(name))
     .map(name => join('api', name).replaceAll('\\', '/')).sort();
@@ -14,9 +14,9 @@ test('시작 틀의 패키징 기준을 보존하고 추가된 메모·복구 AP
   assert.deepEqual(baseline.functions, []);
   assert.deepEqual(baseline.allowedNew, ['api/ai.js', 'api/threat-intel.js']);
   // The packaging template describes the original starter, not the APIs added
-  // during stages 2–10. Keep that baseline immutable and check the live additions.
+  // during stages 2–12. Keep that baseline immutable and check the live additions.
   assert.deepEqual(actual, [...baseline.functions, ...baseline.allowedNew,
-    'api/notes.js', 'api/restore.js'].sort());
+    'api/notes.js', 'api/restore.js', 'api/checks.js'].sort());
 });
 
 test('미구현 서버 뼈대는 성공이나 로그인 통과로 가장하지 않는다', async () => {

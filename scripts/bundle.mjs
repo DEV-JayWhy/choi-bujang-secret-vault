@@ -80,7 +80,7 @@ try {
     fail('자기 점검 대상은 쿼리 없는 Vercel HTTPS 루트 주소여야 합니다.');
   }
   const targetLabel = checkTarget.origin === new URL(config.publicAppUrl).origin ? 'Production 설정 주소' : '별도 지정 검증 주소';
-  const attackAttempts = await runAttackChecks({ ...config, publicAppUrl: checkTarget.origin });
+  const attackAttempts = await runAttackChecks({ ...config, publicAppUrl: checkTarget.origin, checkedCommit: commit });
   for (const attempt of attackAttempts) {
     // A synthetic detector result is not an HTTP response. Label only real
     // transport checks with the requested production host.

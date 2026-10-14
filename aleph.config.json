@@ -1,6 +1,6 @@
 {
   "schema": "aleph.config.v1",
-  "step": 11,
+  "step": 12,
   "repoUrl": "https://github.com/DEV-JayWhy/choi-bujang-secret-vault",
   "publicAppUrl": "https://choi-bujang-secret-vault-xi.vercel.app",
   "sampleMarker": "SAMPLE_NOTE_1",
@@ -105,6 +105,12 @@
       "service": "auth",
       "method": "POST",
       "pathPattern": "/api/device/request",
+      "zone": "authentication"
+    },
+    {
+      "service": "auth",
+      "method": "GET",
+      "pathPattern": "/api/checks",
       "zone": "authentication"
     }
   ],
