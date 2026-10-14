@@ -16,7 +16,7 @@ test('시작 틀의 패키징 기준을 보존하고 추가된 메모·복구·�
   // The packaging template describes the original starter, not the APIs added
   // during stages 2–12. Keep that baseline immutable and check the live additions.
   assert.deepEqual(actual, [...baseline.functions, ...baseline.allowedNew,
-    'api/notes.js', 'api/restore.js', 'api/checks.js'].sort());
+    'api/notes.js', 'api/restore.js'].sort());
 });
 
 test('미구현 서버 뼈대는 성공이나 로그인 통과로 가장하지 않는다', async () => {

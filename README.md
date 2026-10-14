@@ -4,7 +4,7 @@
 
 ## 12단계 작전실 · 실제 결과와 미실행
 
-`/operations.html`에서 「읽기 전용 API 점검 실행」을 누릅니다. `/api/checks`는 지정된 Production에 실제 GET 요청을 보내고 요청 ID·ID 출처·확인 시각·HTTP 상태·정상/금지 구분을 반환합니다. 메모 응답은 구조만 검사한 뒤 폐기하며 본문·제목·사용자 ID·토큰을 JSON에 넣지 않습니다. 확인 실패를 통과로 바꾸지 않습니다. 검사 당시 배포 SHA와 요청 대상 SHA가 다르면 일치로 기록하지 않습니다.
+`/operations.html`에서 「읽기 전용 API 점검 실행」을 누릅니다. Vercel Hobby의 함수 12개 제한을 지키기 위해 `/api/checks`는 기존 세션 함수의 별도 operations view로 rewrite되며, 원래 세션 요청은 기존 인증 처리기로 전달합니다. `/api/checks`는 지정된 Production에 실제 GET 요청을 보내고 요청 ID·ID 출처·확인 시각·HTTP 상태·정상/금지 구분을 반환합니다. 메모 응답은 구조만 검사한 뒤 폐기하며 본문·제목·사용자 ID·토큰을 JSON에 넣지 않습니다. 확인 실패를 통과로 바꾸지 않습니다. 검사 당시 배포 SHA와 요청 대상 SHA가 다르면 일치로 기록하지 않습니다.
 
 화면의 수치는 API의 checks로 계산한 counts입니다. 동일한 가린 JSON을 새 `a12_operations_runs`에 INSERT하고 저장 성공 여부를 반환합니다. 화면에서 JSON을 내려받아 실행 ID로 DB 기록과 대조할 수 있습니다. 테이블은 RLS 및 server 역할의 SELECT·INSERT만 사용하며 UPDATE·DELETE를 허용하지 않습니다. 기존 메모·백업·감사는 보존합니다.
 

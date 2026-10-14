@@ -3,8 +3,18 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {runOperationsChecks,checkCounts} from '../src/operations-checks.mjs';
 import {operationsHandler,readBackendSummary} from '../src/operations-handler.mjs';
+import {isOperationsView} from '../api/auth/session.js';
 const config=JSON.parse(readFileSync(new URL('../aleph.config.json',import.meta.url)));
 const sha='a'.repeat(40);
+test('Hobby function sharing keeps the original session route and recognizes only the operations view',()=>{
+ assert.equal(isOperationsView({url:'/api/auth/session'}),false);
+ assert.equal(isOperationsView({url:'/api/auth/session?view=other'}),false);
+ assert.equal(isOperationsView({url:'/api/checks'}),true);
+ assert.equal(isOperationsView({url:'/api/auth/session?view=operations'}),true);
+ assert.equal(isOperationsView({url:'/api/notes?view=operations'}),false);
+ const routing=JSON.parse(readFileSync(new URL('../vercel.json',import.meta.url)));
+ assert.ok(routing.rewrites.some(r=>r.source==='/api/checks'&&r.destination==='/api/auth/session?view=operations'));
+});
 function transport(calls){return async(input,options)=>{
  const url=new URL(input);calls.push({path:url.pathname,options});
  const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json','x-vercel-id':'iad1::synthetic-request'}});
