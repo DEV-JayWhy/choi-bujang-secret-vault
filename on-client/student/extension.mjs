@@ -1,7 +1,7 @@
 // 이 파일은 학생이 같은 프로젝트에서 이어서 구현합니다.
 // 제공 UI를 받은 것만으로 단계 완료를 인정하지 않습니다.
-export function createStudentView() {
-  return {
+export function createStudentView({ api } = {}) {
+  const view = {
     renderIdentity({ me, devices, sessions }) {
       const root = document.createElement('div');
       const deviceLabels = {
@@ -756,5 +756,194 @@ export function createStudentView() {
       return root;
     },
   };
+  installStudentDashboard(view, api);
+  return view;
+}
+
+// 제공 슬롯 안의 DOM만 꾸밉니다. 제공 화면·전역 상태·인증·조치 경로는 변경하지 않습니다.
+function installStudentDashboard(view, api) {
+  const text = (parent, tag, content) => {
+    const node = document.createElement(tag);
+    node.textContent = content;
+    parent.append(node);
+    return node;
+  };
+  const record = x => x !== null && typeof x === 'object' && !Array.isArray(x);
+  const id = x => typeof x === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/.test(x);
+  const line = x => typeof x === 'string' && x.length <= 2000;
+  const time = x => typeof x === 'string' && Number.isFinite(Date.parse(x));
+  const device = x => ['compliant', 'noncompliant', 'unknown'].includes(x);
+  const session = x => ['active', 'expired', 'revoked', 'unknown'].includes(x);
+  const rows = x => Array.isArray(x) && x.every(r => record(r) && id(r.id) && line(r.text));
+  const validators = {
+    me: d => record(d) && [d.user, d.device, d.session].every(r => record(r) && id(r.id))
+      && line(d.user.label) && line(d.device.label) && device(d.device.status) && session(d.session.status),
+    devices: d => Array.isArray(d) && d.every(r => record(r) && id(r.id) && line(r.label) && device(r.status)),
+    sessions: d => Array.isArray(d) && d.every(r => record(r) && id(r.id) && session(r.status)),
+    events: d => Array.isArray(d) && new Set(d.map(r => r?.id)).size === d.length && d.every(r => record(r) && id(r.id)
+      && ['access', 'xdr'].includes(r.kind) && time(r.at) && line(r.summary) && (r.appId == null || id(r.appId))
+      && rows(r.evidence) && rows(r.rules) && record(r.state) && ['allowed', 'denied', 'unknown'].includes(r.state.access)
+      && session(r.state.session) && device(r.state.device) && Array.isArray(r.supportedActions) && r.supportedActions.every(id)),
+    vulnerabilities: d => {
+      if (!record(d) || !time(d.checkedAt) || !Array.isArray(d.packages) || d.packages.length > 256) return false;
+      if (['not_configured', 'unverifiable'].includes(d.status)) return d.packages.length === 0
+        && d.code === (d.status === 'not_configured' ? 'PROJECT_NOT_CONFIGURED' : 'LOCKFILE_UNVERIFIABLE');
+      if (!['complete', 'partial', 'not_checked'].includes(d.status)
+        || ![1, 2, 3].includes(d.lockfileVersion) || !/^[a-f0-9]{64}$/.test(d.lockfileHash)
+        || !record(d.excluded) || !Number.isSafeInteger(d.excluded.count) || d.excluded.count < 0) return false;
+      if (d.status === 'not_checked') return d.code === 'NO_APPROVED_PACKAGES' && d.packages.length === 0;
+      const semver = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+      const seen = new Set();
+      if (!d.packages.every(p => {
+        if (!record(p) || typeof p.name !== 'string' || !/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/.test(p.name)
+          || typeof p.version !== 'string' || !semver.test(p.version) || seen.has(`${p.name}@${p.version}`)
+          || !['known_vulnerabilities', 'none_found', 'unverifiable'].includes(p.status)
+          || p.source !== 'https://api.osv.dev/v1/querybatch' || !time(p.checkedAt) || !Array.isArray(p.vulnerabilities)) return false;
+        seen.add(`${p.name}@${p.version}`);
+        return p.vulnerabilities.every(v => record(v) && typeof v.id === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/.test(v.id) && time(v.modified))
+          && (p.status !== 'none_found' || p.vulnerabilities.length === 0)
+          && (p.status !== 'known_vulnerabilities' || p.vulnerabilities.length > 0);
+      })) return false;
+      return d.status === 'partial' ? d.packages.some(p => p.status === 'unverifiable') : d.packages.every(p => p.status !== 'unverifiable');
+    },
+  };
+  // GET 응답의 선택 coverage도 제공 화면과 같은 범위·시각 조건으로 확인합니다.
+  function coverageValid(kind, c, data, start, end) {
+    const rule = { devices: ['own-registered-devices', 100], sessions: ['current-verified-connection', 1], events: ['own-recorded-events', 40] }[kind];
+    const keys = ['schema', 'kind', 'scope', 'limit', 'total', 'returned', 'truncated', 'observedAtMs'];
+    if (!rule || !record(c) || Object.keys(c).length !== keys.length || !keys.every(k => Object.hasOwn(c, k))) return false;
+    return c.schema === 'alekov.sdp.coverage.v1' && c.kind === kind && c.scope === rule[0] && c.limit === rule[1]
+      && Array.isArray(data) && Number.isSafeInteger(c.total) && Number.isSafeInteger(c.returned)
+      && c.returned >= 0 && c.returned <= c.limit && c.returned === data.length && c.total >= c.returned
+      && typeof c.truncated === 'boolean' && c.truncated === (c.total > c.returned)
+      && (kind !== 'sessions' || (c.total === 1 && c.returned === 1 && !c.truncated))
+      && Number.isSafeInteger(c.observedAtMs) && c.observedAtMs > 0 && Number.isFinite(new Date(c.observedAtMs).getTime())
+      && c.observedAtMs >= start - 5000 && c.observedAtMs <= end + 5000 && end - c.observedAtMs <= 20000;
+  }
+  const failure = (code, message, mode) => ({ status: 'error', mode, error: { code, message } });
+  async function read(kind) {
+    const start = Date.now();
+    try {
+      const result = await api.get(`/api/${kind}`);
+      const end = Date.now();
+      const mode = ['connected', 'demo', 'disconnected'].includes(result?.meta?.mode) ? result.meta.mode : null;
+      if (result?.ok !== true) {
+        // 원문 예외·알 수 없는 서버 오류 대신 안전한 고정 안내를 표시합니다.
+        const code = result?.error?.code;
+        if (code === 'ENGINE_NOT_CONNECTED') return failure(code, 'SDP 미연결입니다. 제공 화면에서 계정 연결을 확인하세요.', mode);
+        if (['TIMEOUT', 'REQUEST_TIMEOUT', 'ENGINE_TIMEOUT'].includes(code)) return failure('TIMEOUT', '조회 시간이 초과됐습니다. 잠시 후 직접 다시 조회하세요.', mode);
+        return failure('LOOKUP_UNVERIFIED', '이 항목을 조회하지 못했습니다. 제공 화면의 도움정보를 확인하고 직접 다시 조회하세요.', mode);
+      }
+      if (!mode || !validators[kind](result.data)
+        || (Object.hasOwn(result, 'coverage') && ['devices', 'sessions', 'events'].includes(kind)
+          && !coverageValid(kind, result.coverage, result.data, start, end))) {
+        return failure('CONTRACT_MISMATCH', '응답 형식이나 조회 범위를 확인할 수 없습니다. 제공 화면의 도움정보를 확인하세요.', mode);
+      }
+      return { status: 'ok', mode, data: result.data, checkedAt: time(result.meta?.checkedAt) ? result.meta.checkedAt : null };
+    } catch {
+      return failure('LOOKUP_UNVERIFIED', '조회 응답을 확인할 수 없습니다. 로컬 앱 실행 상태를 확인하고 직접 다시 조회하세요.', null);
+    }
+  }
+  const statusText = r => r?.status === 'loading' ? '조회 중' : r?.status === 'error' ? '조회 실패 · 확인 불가'
+    : r?.status === 'ok' ? '응답 확인' : '조회 전 · 확인 불가';
+  const origin = r => r?.mode === 'demo' ? '예시 · 실제 조회 결과 아님' : r?.mode === 'disconnected' ? 'SDP 미연결(disconnected)'
+    : r?.mode === 'connected' ? '연동 시스템 응답 · 로컬 PC 실측 아님' : '출처 확인 불가';
+  function identityCards(parent, input) {
+    const grid = document.createElement('div');
+    grid.setAttribute('style', 'display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:12px;margin:12px 0');
+    const me = input.me;
+    const data = me?.status === 'ok' ? me.data : null;
+    const deviceLabels = { compliant: '보안 기준 충족', noncompliant: '보안 기준 미충족', unknown: '확인 불가' };
+    const sessionLabels = { active: '활성', expired: '만료', revoked: '철회됨', unknown: '확인 불가' };
+    for (const [title, value] of [
+      ['사용자', data?.user?.label],
+      ['기기', data?.device ? `${data.device.label} · ${deviceLabels[data.device.status] || '확인 불가'}(${data.device.status})` : null],
+      ['세션', data?.session ? `${sessionLabels[data.session.status] || '확인 불가'}(${data.session.status})` : null],
+      ['자료 출처', origin(me)],
+    ]) {
+      const card = document.createElement('section');
+      card.setAttribute('style', 'border:1px solid currentColor;border-radius:12px;padding:14px;overflow-wrap:anywhere');
+      text(card, 'h4', title);
+      text(card, 'p', value || statusText(me));
+      grid.append(card);
+    }
+    parent.append(grid);
+    text(parent, 'p', '사용자·기기·세션 정보입니다. CPU·메모리·디스크 실측 카드는 제공 데이터 준비 후 연결합니다.');
+  }
+  for (const [name, title, kinds] of [
+    ['renderIdentity', '1. 계정·기기·세션 확인', ['me', 'devices', 'sessions']],
+    ['renderEvents', '2. 보안 기록 확인', ['events']],
+    ['renderVulnerabilities', '3. 설치 패키지 조회', ['vulnerabilities']],
+  ]) {
+    const original = view[name];
+    let cell;
+    view[name] = input => {
+      const key = JSON.stringify(input);
+      if (!cell || key !== cell.key) {
+        if (cell) { cell.sequence++; clearTimeout(cell.timer); }
+        cell = { key, input, sequence: 0, busy: false, current: null, times: [], root: document.createElement('section') };
+      }
+      const current = cell;
+      function paint() {
+        const focused = typeof document !== 'undefined' && document.activeElement === current.button;
+        current.root.replaceChildren();
+        current.root.setAttribute('aria-busy', String(current.busy));
+        text(current.root, 'h3', title);
+        const button = text(current.root, 'button', '다시 조회');
+        current.button = button;
+        button.type = 'button';
+        // aria-disabled로 포커스를 유지하고 click에서도 중복 요청을 차단합니다.
+        button.setAttribute('aria-disabled', String(current.busy || typeof api?.get !== 'function'));
+        button.setAttribute('aria-label', `${title} 다시 조회`);
+        const progress = text(current.root, 'p', current.busy ? '조회 중 · 응답을 기다리고 있습니다.'
+          : typeof api?.get !== 'function' ? '학생 조회 연결을 사용할 수 없습니다. 제공 화면의 다시 불러오기를 사용하세요.' : '버튼을 누를 때만 다시 조회합니다. 제공 공통 화면과 별도로 이 학생 영역만 갱신합니다.');
+        progress.setAttribute('role', 'status');
+        progress.setAttribute('aria-live', 'polite');
+        const effective = current.current || current.input;
+        const resources = name === 'renderIdentity' ? kinds.map(k => [k, effective[k]]) : [[kinds[0], effective]];
+        for (const [kind, resource] of resources) {
+          text(current.root, 'p', `${kind}: ${statusText(resource)} · ${origin(resource)}`);
+          text(current.root, 'p', `${kind} 원천 확인 시각: ${resource?.checkedAt || '확인 불가 · 제공 입력에 시각 없음'}`);
+          if (resource?.status === 'error') {
+            const code = ['ENGINE_NOT_CONNECTED', 'TIMEOUT', 'CONTRACT_MISMATCH', 'LOOKUP_UNVERIFIED'].includes(resource.error?.code) ? resource.error.code : 'LOOKUP_UNVERIFIED';
+            text(current.root, 'p', `${kind} 조회 실패(${code}): 예시로 대체하지 않습니다. 계정 연결·앱 실행 상태를 확인한 뒤 직접 다시 조회하세요. 권한 문제가 계속되면 담당자에게 문의하세요.`);
+          }
+        }
+        if (name === 'renderIdentity') identityCards(current.root, effective);
+        text(current.root, 'h4', '상세 결과');
+        current.root.append(original(effective));
+        if (current.times.length) {
+          text(current.root, 'h4', '최근 학생 영역 조회 기록');
+          const list = document.createElement('ul');
+          for (const item of current.times) text(list, 'li', item);
+          current.root.append(list);
+          text(current.root, 'p', '이 시각은 요청 종료 시각이며 PC 측정 시각이 아닙니다. 이 화면의 최근 5회만 보관하고 입력 변경·새로고침 시 지웁니다.');
+        }
+        button.addEventListener('click', () => {
+          if (current !== cell || current.busy || typeof api?.get !== 'function') return;
+          current.busy = true;
+          const sequence = ++current.sequence;
+          const loading = k => ({ status: 'loading', mode: (name === 'renderIdentity' ? current.input[k] : current.input)?.mode });
+          current.current = name === 'renderIdentity' ? Object.fromEntries(kinds.map(k => [k, loading(k)])) : loading(kinds[0]);
+          paint();
+          const finish = results => {
+            if (current !== cell || current.sequence !== sequence) return;
+            clearTimeout(current.timer);
+            current.busy = false;
+            current.current = name === 'renderIdentity' ? Object.fromEntries(kinds.map((k, i) => [k, results[i]])) : results[0];
+            current.times.unshift(`${new Date().toISOString()} · ${kinds.map((k, i) => `${k}: ${statusText(results[i])} · ${origin(results[i])}`).join(' / ')}`);
+            current.times = current.times.slice(0, 5);
+            current.sequence++;
+            paint();
+          };
+          current.timer = setTimeout(() => finish(kinds.map(() => failure('TIMEOUT', '조회 시간이 초과됐습니다. 직접 다시 조회하세요.', null))), 15000);
+          Promise.all(kinds.map(read)).then(finish);
+        });
+        if (focused && typeof button.focus === 'function') button.focus();
+      }
+      paint();
+      return current.root;
+    };
+  }
 }
 
