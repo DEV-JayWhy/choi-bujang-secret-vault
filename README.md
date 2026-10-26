@@ -19,6 +19,10 @@
 
 현재 package-app 명령·PC 상태 조회·학생 꾸밈 지원 코드는 준비됐습니다. R7 실행 환경 묶음도 공개 공식 경로에서 받을 수 있습니다. Windows 설치·승인 호스트·아이콘·실제 포장·바로가기·사용자 PC 실측은 별도 확인 대상입니다. AI Linux 호스트의 실행 환경 조회는 PROVIDED_RUNTIME_NOT_INSTALLED이며 우회하지 않았습니다. 구체적인 업데이트·공식 R7 설치 미리보기·포장 순서는 [실행 설명서 현재 0.2.19 절](docs/STUDENT_RUNBOOK.md)을 봅니다. 포장 성공·실제 SDP/AI 연결·공식 제출을 수행한 것으로 기록하지 않습니다.
 
+## 학생 부분 · 7일차 시연과 정리
+
+[시연 순서·제공/학생 기능·한계·근거 정리](docs/DEMO_HANDOFF.md)를 추가했습니다. 기준 실행 커밋은 `bed7ed3f0f80c6fe152211ce022824bb361dbaae`이고 앱 버전은 0.2.19입니다. 계정·기기·세션 → 보안 기록 → 패키지 조회 순서이며, 모의 DOM·Linux 로컬 API 리허설을 실제 브라우저 시연과 구분합니다. 동일 커밋의 [실행 기록](docs/evidence/reproduction-0.2.19.json)과 [AI Linux 환경 PC 조회 기록](docs/evidence/day7-pc-check.json)을 보존했습니다. 사용자 PC 실측 화면·Windows 설치·생성 패키지 경로·바로가기는 없거나 미확인이며 실사용 검증 중입니다. 이번 추가는 문서·증거뿐이고 앱 코드는 변경하지 않습니다.
+
 ## 학생 부분 · 22단계 최종 인수인계와 재현
 
 최종 인수인계·버전 이력·단계별 재현·데이터 보존/복원 계획은 [docs/FINAL_HANDOFF.md](docs/FINAL_HANDOFF.md)에 있습니다. 같은 최종 커밋을 새 폴더에 복제한 뒤 [docs/verify-final.mjs](docs/verify-final.mjs)를 실행하면 그 checkout의 40자리 커밋과 검사 전후 상태·시각·모의 DOM·로컬 HTTP 결과를 프로젝트 밖 JSON에 기록합니다.

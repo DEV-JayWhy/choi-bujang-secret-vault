@@ -1,0 +1,276 @@
+{
+  "schema": "keshev.student-reproduction.v1",
+  "repository": "https://github.com/DEV-JayWhy/choi-bujang-secret-vault",
+  "branch": "main",
+  "checkout": "HEAD",
+  "commit": "bed7ed3f0f80c6fe152211ce022824bb361dbaae",
+  "onClientTree": "e0a6d33ac76fbe379981a84691b9b336c9a78ad0",
+  "releaseState": "verification_in_progress",
+  "startedAt": "2026-10-26T05:22:37.940Z",
+  "environment": {
+    "os": "linux",
+    "arch": "x64",
+    "node": "v24.22.1",
+    "npm": "11.9.0",
+    "appVersion": "0.2.19",
+    "nodeCourseTarget": "24.19.0"
+  },
+  "cleanBefore": true,
+  "evidenceKinds": [
+    "local_process_and_http",
+    "mock_dom",
+    "source_review"
+  ],
+  "syntax": {
+    "command": "node --check student/extension.mjs",
+    "result": "passed",
+    "checkedAt": "2026-10-26T05:22:38.082Z"
+  },
+  "http": [
+    {
+      "run": "default",
+      "method": "GET",
+      "path": "/",
+      "http": 200,
+      "checkedAt": "2026-10-26T05:22:38.183Z"
+    },
+    {
+      "run": "default",
+      "method": "GET",
+      "path": "/student/extension.mjs",
+      "http": 200,
+      "checkedAt": "2026-10-26T05:22:38.188Z"
+    },
+    {
+      "run": "default",
+      "method": "GET",
+      "path": "/api/me",
+      "http": 503,
+      "checkedAt": "2026-10-26T05:22:38.191Z",
+      "mode": "disconnected",
+      "ok": false,
+      "code": "ENGINE_NOT_CONNECTED"
+    },
+    {
+      "run": "default",
+      "method": "GET",
+      "path": "/api/events",
+      "http": 503,
+      "checkedAt": "2026-10-26T05:22:38.192Z",
+      "mode": "disconnected",
+      "ok": false,
+      "code": "ENGINE_NOT_CONNECTED"
+    },
+    {
+      "run": "default",
+      "method": "GET",
+      "path": "/api/diagnostics",
+      "http": 200,
+      "checkedAt": "2026-10-26T05:22:38.193Z",
+      "mode": "disconnected",
+      "ok": true
+    },
+    {
+      "run": "default",
+      "method": "GET",
+      "path": "/api/vulnerabilities",
+      "http": 200,
+      "checkedAt": "2026-10-26T05:22:38.195Z",
+      "mode": "disconnected",
+      "ok": true,
+      "dataStatus": "not_configured"
+    },
+    {
+      "run": "demo",
+      "method": "GET",
+      "path": "/",
+      "http": 200,
+      "checkedAt": "2026-10-26T05:22:38.279Z"
+    },
+    {
+      "run": "demo",
+      "method": "GET",
+      "path": "/student/extension.mjs",
+      "http": 200,
+      "checkedAt": "2026-10-26T05:22:38.280Z"
+    },
+    {
+      "run": "demo",
+      "method": "GET",
+      "path": "/api/me",
+      "http": 200,
+      "checkedAt": "2026-10-26T05:22:38.283Z",
+      "mode": "demo",
+      "ok": true
+    },
+    {
+      "run": "demo",
+      "method": "GET",
+      "path": "/api/events",
+      "http": 200,
+      "checkedAt": "2026-10-26T05:22:38.284Z",
+      "mode": "demo",
+      "ok": true,
+      "count": 1
+    },
+    {
+      "run": "demo",
+      "method": "GET",
+      "path": "/api/diagnostics",
+      "http": 200,
+      "checkedAt": "2026-10-26T05:22:38.285Z",
+      "mode": "demo",
+      "ok": true
+    },
+    {
+      "run": "demo",
+      "method": "GET",
+      "path": "/api/vulnerabilities",
+      "http": 200,
+      "checkedAt": "2026-10-26T05:22:38.286Z",
+      "mode": "demo",
+      "ok": true,
+      "dataStatus": "not_configured"
+    },
+    {
+      "run": "default-restart",
+      "method": "GET",
+      "path": "/",
+      "http": 200,
+      "checkedAt": "2026-10-26T05:22:38.361Z"
+    },
+    {
+      "run": "default-restart",
+      "method": "GET",
+      "path": "/student/extension.mjs",
+      "http": 200,
+      "checkedAt": "2026-10-26T05:22:38.363Z"
+    },
+    {
+      "run": "default-restart",
+      "method": "GET",
+      "path": "/api/me",
+      "http": 503,
+      "checkedAt": "2026-10-26T05:22:38.365Z",
+      "mode": "disconnected",
+      "ok": false,
+      "code": "ENGINE_NOT_CONNECTED"
+    },
+    {
+      "run": "default-restart",
+      "method": "GET",
+      "path": "/api/events",
+      "http": 503,
+      "checkedAt": "2026-10-26T05:22:38.365Z",
+      "mode": "disconnected",
+      "ok": false,
+      "code": "ENGINE_NOT_CONNECTED"
+    },
+    {
+      "run": "default-restart",
+      "method": "GET",
+      "path": "/api/diagnostics",
+      "http": 200,
+      "checkedAt": "2026-10-26T05:22:38.366Z",
+      "mode": "disconnected",
+      "ok": true
+    },
+    {
+      "run": "default-restart",
+      "method": "GET",
+      "path": "/api/vulnerabilities",
+      "http": 200,
+      "checkedAt": "2026-10-26T05:22:38.367Z",
+      "mode": "disconnected",
+      "ok": true,
+      "dataStatus": "not_configured"
+    }
+  ],
+  "stages": [
+    {
+      "stage": 13,
+      "checks": "본인·기기·세션 표시 및 원래 상태 코드",
+      "kind": "mock_dom",
+      "checkedAt": "2026-10-26T05:22:38.084Z",
+      "result": "passed_within_scope"
+    },
+    {
+      "stage": 14,
+      "checks": "unknown은 접근 허용이 아님",
+      "kind": "mock_dom",
+      "checkedAt": "2026-10-26T05:22:38.085Z",
+      "result": "passed_within_scope"
+    },
+    {
+      "stage": 15,
+      "checks": "원본 불변·최신순 목록·버튼 상세 근거·규칙",
+      "kind": "mock_dom",
+      "checkedAt": "2026-10-26T05:22:38.085Z",
+      "result": "passed_within_scope"
+    },
+    {
+      "stage": 16,
+      "checks": "빈 목록·loading·미조회 진단 구분",
+      "kind": "mock_dom",
+      "checkedAt": "2026-10-26T05:22:38.086Z",
+      "result": "passed_within_scope"
+    },
+    {
+      "stage": 17,
+      "checks": "test/verified·설명 미실행·idle 초기화",
+      "kind": "mock_dom",
+      "checkedAt": "2026-10-26T05:22:38.087Z",
+      "result": "passed_within_scope"
+    },
+    {
+      "stage": 18,
+      "checks": "현재 사건 근거·규칙·unknown·잘못된 ID 거절·event null 오류",
+      "kind": "mock_dom",
+      "checkedAt": "2026-10-26T05:22:38.087Z",
+      "result": "passed_within_scope"
+    },
+    {
+      "stage": 19,
+      "checks": "11상태·ACK와 효과 구분·효과 true만 확인·학생 실행 버튼 없음",
+      "kind": "mock_dom",
+      "checkedAt": "2026-10-26T05:22:38.088Z",
+      "result": "passed_within_scope"
+    },
+    {
+      "stage": 20,
+      "checks": "정확한 버전·partial ID 보존·전체 상태·loading 초기화",
+      "kind": "mock_dom",
+      "checkedAt": "2026-10-26T05:22:38.089Z",
+      "result": "passed_within_scope"
+    },
+    {
+      "stage": 21,
+      "checks": "현재 원문의 설명서·명령·구성도·제한 확인",
+      "kind": "source_review",
+      "checkedAt": "2026-10-26T05:22:38.089Z",
+      "result": "passed_within_scope"
+    }
+  ],
+  "unverified": [
+    "Windows PowerShell",
+    "real browser UI",
+    "live SDP/XDR identity and authorization",
+    "paid AI explanation",
+    "live action execution and observation",
+    "external OSV lookup",
+    "official ALEPH submission and judgment"
+  ],
+  "shutdown": "verified_process_exit_for_each_run",
+  "cleanAfter": true,
+  "finishedAt": "2026-10-26T05:22:38.372Z",
+  "result": "passed_within_scope",
+  "boundaries": {
+    "paidAiCalls": 0,
+    "externalOsvCalls": 0,
+    "actionPosts": 0,
+    "submissions": 0,
+    "credentialsCopied": false,
+    "browserUiVerified": false,
+    "officialPassClaimed": false
+  }
+}

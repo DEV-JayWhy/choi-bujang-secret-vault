@@ -1,0 +1,129 @@
+{
+  "schema": "keshev.day7.pc-observation.v1",
+  "repository": "https://github.com/DEV-JayWhy/choi-bujang-secret-vault",
+  "commit": "bed7ed3f0f80c6fe152211ce022824bb361dbaae",
+  "onClientTree": "e0a6d33ac76fbe379981a84691b9b336c9a78ad0",
+  "appVersion": "0.2.19",
+  "kind": "actual_local_process_and_http",
+  "environment": {
+    "os": "Linux",
+    "arch": "x86_64",
+    "node": "v24.22.1",
+    "measurementTarget": "AI execution Linux environment; NOT student Windows PC"
+  },
+  "startedAt": "2026-10-26T05:39:45.969646+00:00",
+  "request": {
+    "method": "GET",
+    "path": "/api/pc/status",
+    "http": 200
+  },
+  "measuredAt": "2026-10-26T05:39:46.338Z",
+  "metrics": [
+    {
+      "metric": "memory",
+      "source": "local-pc",
+      "measuredAt": "2026-10-26T05:39:46.338Z",
+      "value": {
+        "state": "ok",
+        "usedBytes": 779243520,
+        "totalBytes": 10451439616
+      },
+      "units": {
+        "usedBytes": "bytes",
+        "totalBytes": "bytes"
+      }
+    },
+    {
+      "metric": "network",
+      "source": "local-pc",
+      "measuredAt": "2026-10-26T05:39:46.338Z",
+      "value": {
+        "state": "unavailable",
+        "reason": "query_failed"
+      },
+      "units": {
+        "interfaceCount": "count",
+        "ipv4Count": "count"
+      }
+    },
+    {
+      "metric": "firewall",
+      "source": "local-pc",
+      "measuredAt": "2026-10-26T05:39:46.338Z",
+      "value": {
+        "state": "unavailable",
+        "reason": "unsupported"
+      },
+      "units": {
+        "profiles": "boolean per profile"
+      }
+    },
+    {
+      "metric": "events",
+      "source": "local-pc",
+      "measuredAt": "2026-10-26T05:39:46.338Z",
+      "value": {
+        "state": "unavailable",
+        "reason": "unsupported"
+      },
+      "units": {
+        "warningCount": "count",
+        "errorCount": "count"
+      }
+    },
+    {
+      "metric": "disk",
+      "source": "local-pc",
+      "measuredAt": "2026-10-26T05:39:46.338Z",
+      "value": {
+        "state": "ok",
+        "totalBytes": 33770192896,
+        "freeBytes": 30878932992
+      },
+      "units": {
+        "freeBytes": "bytes",
+        "totalBytes": "bytes"
+      }
+    },
+    {
+      "metric": "cpu",
+      "source": "local-pc",
+      "measuredAt": "2026-10-26T05:39:46.338Z",
+      "value": {
+        "state": "ok",
+        "usagePercent": 0,
+        "sampleMs": 200
+      },
+      "units": {
+        "usagePercent": "%",
+        "sampleMs": "ms"
+      }
+    }
+  ],
+  "screenshots": [],
+  "package": {
+    "generated": false,
+    "outputPath": null,
+    "manifestPath": null,
+    "installGuidePath": null,
+    "shortcutVerified": false
+  },
+  "boundaries": {
+    "studentPcMeasured": false,
+    "browserUiVerified": false,
+    "windowsVerified": false,
+    "paidAiCalls": 0,
+    "externalOsvCalls": 0,
+    "actionPosts": 0,
+    "submissions": 0,
+    "settingsChanged": false
+  },
+  "limitations": [
+    "Single observation; no PC trend comparison",
+    "Network/firewall/events failures stay unavailable",
+    "PC query does not establish SDP connectivity"
+  ],
+  "shutdown": "own_server_process_exit_verified",
+  "finishedAt": "2026-10-26T05:39:46.349681+00:00",
+  "result": "observed_with_partial_unavailability"
+}
