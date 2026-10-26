@@ -8,20 +8,26 @@
 
 - 실행 설명서·글로 쓴 구성도·제공/학생 구현 경계·오류 복구·검증 기록: [docs/STUDENT_RUNBOOK.md](docs/STUDENT_RUNBOOK.md)
 - 앱 작업 위치: `on-client`. 구성은 브라우저 → 로컬 서버 → 설정된 접근 제어·XDR 어댑터 / 서버 AI 서비스이며 OSV 조회는 승인된 공개 패키지만 담당합니다.
-- 앱 package 버전 `0.2.11`, Node.js 수업 기준 `24.19.0`, Windows 실행 도구의 허용 범위 22~24. 이번 직접 확인은 Linux x86_64·Node.js `v24.22.1`·npm `11.9.0`입니다. Windows PowerShell 및 실제 브라우저 동작은 미확인입니다.
+- 앱 package 버전 `0.2.19`(2026-10-26 공식 제공 업데이트), Node.js 수업 기준 `24.19.0`, Windows 실행 도구의 허용 범위 22~24. 이번 직접 확인은 Linux x86_64·Node.js `v24.22.1`·npm `11.9.0`입니다. Windows PowerShell 및 실제 브라우저 동작은 미확인입니다.
 - 앱 폴더에서 `npm run check`, `npm start` 또는 별도의 `npm run demo`를 사용하며 브라우저 주소는 `http://127.0.0.1:5189/`입니다. 기본은 `disconnected`, 예제는 `demo`이고 운영 연결 성공이 아닙니다. 앱 폴더에는 외부 npm 의존성이 없어 기본 실행에 별도 설치가 필요하지 않습니다.
 - 실제 AI·SDP/XDR·조치 집행·OSV 외부 조회와 새 Windows 환경 재현은 미확인입니다. 실제 학생 조치 집행·효과 확인은 미완료(UNV)입니다.
 - 21·22단계는 이번 공식 안내에 따라 저장소와 40자리 커밋을 직접 입력하고, 비공개 커밋은 과제 화면의 원문 도구를 사용합니다. 워크벤치 「포털 제출 준비」는 현재 13~20단계용입니다. 서버 AI의 원문 검토는 명령 실행이나 새 환경 재현을 대신하지 않습니다.
+
+## 학생 부분 · 마지막 총공세 0.2.19 업데이트
+
+공식 시작 틀·업데이트 도구의 이전/새 해시를 대조해 제공 파일 45개를 반영했습니다. 기존 student/extension.mjs·engine-adapter.mjs는 그대로이며, 새 appearance.json은 이름 케셰브·student-first 배치만 지정합니다. 학생 화면과 제공 「내 PC 상태」를 구분하고 PC 수집기를 중복 구현하지 않습니다. 기존 프로젝트 폴더·Git 기록·제출물은 보존합니다.
+
+현재 package-app 명령·PC 상태 조회·학생 꾸밈 지원 코드는 준비됐습니다. R7 실행 환경 묶음도 공개 공식 경로에서 받을 수 있습니다. Windows 설치·승인 호스트·아이콘·실제 포장·바로가기·사용자 PC 실측은 별도 확인 대상입니다. AI Linux 호스트의 실행 환경 조회는 PROVIDED_RUNTIME_NOT_INSTALLED이며 우회하지 않았습니다. 구체적인 업데이트·공식 R7 설치 미리보기·포장 순서는 [실행 설명서 현재 0.2.19 절](docs/STUDENT_RUNBOOK.md)을 봅니다. 포장 성공·실제 SDP/AI 연결·공식 제출을 수행한 것으로 기록하지 않습니다.
 
 ## 학생 부분 · 22단계 최종 인수인계와 재현
 
 최종 인수인계·버전 이력·단계별 재현·데이터 보존/복원 계획은 [docs/FINAL_HANDOFF.md](docs/FINAL_HANDOFF.md)에 있습니다. 같은 최종 커밋을 새 폴더에 복제한 뒤 [docs/verify-final.mjs](docs/verify-final.mjs)를 실행하면 그 checkout의 40자리 커밋과 검사 전후 상태·시각·모의 DOM·로컬 HTTP 결과를 프로젝트 밖 JSON에 기록합니다.
 
-Git 최상위에서 `node docs/verify-final.mjs --output ../keshev-evidence/final-reproduction.json`으로 실행합니다. 이 도구는 Linux·Node.js v24.22.1에서 확인하며 Windows·실제 브라우저는 미확인입니다. `on-client` 앱 원문과 package 버전 0.2.11은 유지합니다. 실제 AI·SDP/XDR·OSV 외부 조회와 19단계 실제 집행·효과 확인은 미확인/미완료(UNV)이므로 릴리스 상태는 검증 중이며 v1.0 또는 운영 인증이 아닙니다. 공식 제출은 사용자가 수행하며 원문 검토를 실행 성공 증명으로 표현하지 않습니다.
+Git 최상위에서 `node docs/verify-final.mjs --output ../keshev-evidence/final-reproduction.json`으로 실행합니다. 이 도구는 Linux·Node.js v24.22.1에서 확인하며 Windows·실제 브라우저는 미확인입니다. 22단계 당시 앱은 0.2.11이었으며 기존 증거는 그 커밋의 기록입니다. 마지막 총공세 작업본은 공식 0.2.19로 업데이트됐고 검사 도구도 추가된 package-app 명령을 대조합니다. 서로 다른 버전의 검사 결과를 합쳐 전체 성공이라고 쓰지 않습니다. 실제 AI·SDP/XDR·OSV 외부 조회와 19단계 실제 집행·효과 확인은 미확인/미완료(UNV)이므로 릴리스 상태는 검증 중이며 v1.0 또는 운영 인증이 아닙니다. 공식 제출은 사용자가 수행하며 원문 검토를 실행 성공 증명으로 표현하지 않습니다.
 
 ### 22단계 실행 증거 전달 보완
 
-실제 재현 커밋 `6d216c499d37fd80ed1fa4a54ba84ffe76e8d9f1`의 [실행 증거 JSON](docs/evidence/reproduction-6d216c499d37.json)을 저장소 원문에 포함했습니다. Linux·Node v24.22.1·npm 11.9.0·앱 0.2.11, 검사 전후 깨끗한 작업 트리, 단계 검사 9개 묶음과 HTTP 18건, 실행 시각·미확인 항목이 기록돼 있습니다. 이 커밋의 앱 원문 트리는 실행 커밋과 동일하며, 문서·증거 보완 커밋을 원래 실행 커밋과 혼동하지 않습니다. 자세한 결과·대조 명령은 [FINAL_HANDOFF.md](docs/FINAL_HANDOFF.md)에 있습니다.
+실제 재현 커밋 `6d216c499d37fd80ed1fa4a54ba84ffe76e8d9f1`의 [실행 증거 JSON](docs/evidence/reproduction-6d216c499d37.json)을 저장소 원문에 포함했습니다. Linux·Node v24.22.1·npm 11.9.0·앱 0.2.11, 검사 전후 깨끗한 작업 트리, 단계 검사 9개 묶음과 HTTP 18건, 실행 시각·미확인 항목이 기록돼 있습니다. 당시 증거 보완 커밋 `5e4feee9f33b42c7dc6a86eae58815f97ecbe76f`의 앱 원문 트리는 실행 커밋과 동일했습니다. 이후 0.2.19 업데이트 작업본을 원래 실행 커밋과 혼동하지 않습니다. 자세한 결과·대조 명령은 [FINAL_HANDOFF.md](docs/FINAL_HANDOFF.md)에 있습니다.
 
 ## 12단계 작전실 · 실제 결과와 미실행
 

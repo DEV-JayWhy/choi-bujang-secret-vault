@@ -18,7 +18,7 @@ const commit = git('rev-parse', 'HEAD');
 const onClientTree = git('rev-parse', 'HEAD:on-client');
 const cleanBefore = git('status', '--porcelain') === '';
 const meta = JSON.parse(await readFile(resolve(app, 'package.json'), 'utf8'));
-assert.deepEqual(meta.scripts, { start: 'node src/server.mjs', demo: 'node src/server.mjs --demo', check: 'node --check student/extension.mjs' });
+assert.deepEqual(meta.scripts, { start: 'node src/server.mjs', demo: 'node src/server.mjs --demo', check: 'node --check student/extension.mjs', 'package-app': 'node tools/package-app.mjs' });
 const report = {
   schema: 'keshev.student-reproduction.v1', repository: 'https://github.com/DEV-JayWhy/choi-bujang-secret-vault',
   branch: 'main', checkout: git('rev-parse', '--abbrev-ref', 'HEAD'), commit, onClientTree, releaseState: 'verification_in_progress',

@@ -1,9 +1,71 @@
 # 케셰브 학생용 실행 설명서와 시스템 구성도
 
 
+## 현재 실행 기준: 공식 0.2.19 업데이트 적용
+
+2026-10-26(KST), 마지막 총공세 후속 작업입니다. 기존 21·22단계와 4·5일차 기록은 당시 버전의 기록으로 보존합니다. **현재 기능·포장 준비 여부는 이 절이 우선**합니다. package 버전만으로 실제 연결·승인·설치를 인정하지 않습니다.
+
+- 공식 다운로드: https://aleph-workbench-downloads.vercel.app/alekov-connect-0.2.19.html
+- 시작 틀 ZIP SHA-256: `8ac6fbca48aa13905c2f2e73e3b06ae748dabd7e004a9acc158360ef7f1bd634`
+- 업데이트 도구 SHA-256: `9c294b0783970e03fe97fec7039149b48659cf3d7118ce96f1388dd38a1be735`
+- R7 준비 묶음: https://aleph-workbench-downloads.vercel.app/alekov-runtime-r7.html
+- R7 묶음 SHA-256: `c2e66b18f44080620ddc02360e637f33d5a428e13f29ecd05d20cc7e7103dc92`
+
+공식 Windows 업데이트 도구의 0.2.11 고정 목록 45개를 원본 바이트 및 LF 정규화 해시로 대조해 충돌 없음으로 확인했습니다. AI 환경은 Linux라 PowerShell 업데이트 도구를 실행한 것이 아닙니다. 별도 Git 복제본에서 해당 고정 목록의 새 파일 바이트를 ZIP·도구의 새 SHA-256과 대조한 뒤 적용했습니다. 학생 extension.mjs·engine-adapter.mjs는 바이트 그대로 보존했습니다. 기존 작업 폴더·Git 기록·개인 설정·제출물은 삭제하거나 옮기지 않았습니다.
+
+### 제공 기능과 학생 변경
+
+| 항목 | 제공 0.2.19 기능 | 이번 학생 작업 |
+|---|---|---|
+| PC 조회 | src/pc-status.mjs, GET /api/pc/status, public/pc-status-view.mjs | 중복 수집기를 만들지 않고 제공 「내 PC 상태」 사용 |
+| 측정 범위 | CPU 200ms 표본 %, 메모리 사용/전체 bytes, 앱이 있는 디스크 여유/전체 bytes | 실제 사용자 PC 값으로 꾸민 예시를 추가하지 않음 |
+| 네트워크 | 인터페이스·IPv4 구성 개수 | IP·게이트웨이·DNS 주소 목록이 제공된다고 쓰지 않음 |
+| 방화벽·기록 | 일반 권한의 읽기 전용 Get-NetFirewallProfile, 최근 24시간 System/Application 경고·오류 합계, 최대 5,000건 | 권한 오류·미지원은 확인 불가. 로그별 별도 집계는 현재 계약에 없어 있다고 쓰지 않음 |
+| 꾸밈 | 공식 student/appearance.json 스키마·student-first preset | 이름 케셰브·학생 영역 우선 배치 설정 추가. 기존 요약 카드·재조회 함수 보존 |
+| 포장 | package-app·공식 설치기·manifest·finish-materials | 새 포장기를 만들지 않음. 이번에 실제 패키지 생성·Windows 설치하지 않음 |
+
+기존 extension.mjs의 학생 GET 허용 목록 안 재조회는 그대로입니다. PC 조회는 제공 카드의 버튼을 사용합니다. 학생이 계획한 직전/현재 PC 비교 기능은 아직 구현하지 않았습니다. 관제 대시보드 목표와 준비된 실제 기능을 구분합니다. Windows 기록 건수는 침해·공격 탐지 결과가 아닙니다. PC 조회 성공은 SDP 연결 성공이 아닙니다.
+
+### 실제 확인한 결과와 미확인
+
+| 종류 | 이번 결과 |
+|---|---|
+| Linux 로컬 실행·GET | 기존 9개 검사 묶음·18개 GET 통과. 추가 PC GET·꾸밈/PC 모듈 응답 200 확인 |
+| AI 실행 환경의 PC 조회 | CPU·메모리·디스크 읽기 성공. 네트워크 query_failed, Windows 방화벽·기록 unsupported. 사용자의 PC 실측 결과가 아님 |
+| 모의 Windows 자료 | 권한 거부는 확인 불가, 일부 집계에서 0건도 안전 판정이 아님을 확인 |
+| R7 무결성 | 공식 묶음의 체크섬·내부 MANIFEST 파일 크기·해시, 제공 검증기의 runtime.zip/카탈로그 내용 결속 확인. 설치된 신뢰 루트에 의한 서명 권한 검증은 미수행 |
+| 승인 실행 환경 | AI Linux 호스트의 고정 경로 조회는 PROVIDED_RUNTIME_NOT_INSTALLED. 사용자 Windows의 상태를 대신 판정하지 않음 |
+| 미확인 | Windows 설치·PowerShell·실제 브라우저·일반 권한 PC 값·아이콘·패키지 생성·INSTALL.md·바로가기·실제 SDP/AI 연결 |
+
+### Windows에서 포장까지 이어가는 공식 순서
+
+아래는 사용자 PC에서 아직 실행하지 않은 절차입니다. 공식 R7 묶음을 기존 프로젝트 밖에 압축 해제하고 README.md·MANIFEST.json을 확인합니다. 실제 경로는 사용자 PC에서 선택하며 예시 경로를 실경로로 기록하지 않습니다. 설치기의 기본은 미리보기이고 -Apply를 붙여야 변경합니다.
+
+1. **프로젝트 준비:** GitHub 변경을 받을 때 먼저 `git status --short`로 기존 작업을 확인합니다. 변경·충돌을 강제로 덮어쓰지 않습니다. PC의 프로젝트가 여전히 0.2.11이면 R7 묶음의 project/update-alekov-0.2.19.ps1 공식 미리보기·적용 절차를 따릅니다. 이미 0.2.19를 반영한 작업본은 다시 덮어쓰지 않습니다.
+2. **실행 환경 준비:** R7 묶음을 푼 폴더에서 일반 권한 PowerShell을 엽니다. 입력을 저장하고 자신이 실행한 케셰브를 정상 종료한 뒤 아래 미리보기를 실행합니다.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\runtime\install-alekov-runtime-0.2.19.ps1 -ZipPath .\runtime\alekov-runtime-0.2.19-r7.zip -CatalogPath .\runtime\alekov-runtime-0.2.19-r7.catalog.json
+```
+
+`DRY_RUN_READY`이고 변경 내용이 맞을 때만 같은 명령 끝에 `-Apply`를 붙입니다. `ALREADY_LATEST`면 재설치하지 않습니다. 실행 중·신뢰 키·서명·권한 오류가 실제로 나오면 그 오류에서 중단하며 키를 만들거나 우회하지 않습니다. 현재 자료를 받은 것만으로 담당자 준비가 필요하다고 단정하지 않습니다. 설치기는 기존 호스트·신뢰 키·이전 캐시를 보존하며, 이 절의 실제 성공은 미확인입니다.
+
+3. **앱·아이콘·출력 폴더:** 기존 on-client에서 `npm run check`와 `npm start`를 확인하고 종료합니다. 아이콘은 256×256, 8비트 RGB/RGBA, 비인터레이스 PNG가 필요합니다. 현재 appearance에는 이름과 배치만 있고 icon은 없으므로 유효한 실제 파일의 `--iconPath`가 필요합니다. 출력은 프로젝트 밖의 아직 없는 새 폴더를 고르며 상위 폴더는 있어야 합니다. 앱 작업은 먼저 커밋하고 미커밋 변경이 없는지 확인합니다.
+4. **포장:** `on-client/docs/PACKAGE_APP.md`의 공식 명령을 사용합니다. source는 현재 on-client, out·iconPath는 위에서 확인한 실제 경로를 사용합니다. 다음의 괄호 값은 실행용 실경로가 아니라 자리 표시자입니다.
+
+```text
+npm run package-app -- --source . --out "<프로젝트 밖의 아직 없는 새 출력 폴더>" --iconPath "<검증한 256×256 PNG 전체 경로>" --finish-materials
+```
+
+`PROVIDED_RUNTIME_NOT_INSTALLED`, 승인 누락·서명·경로·소스 불일치가 나오면 우회하거나 --app-only-v1로 바꾸지 않습니다. 실제 원인 코드와 단계만 기록합니다. 새로운 승인 키를 요청·출력·복사하지 않습니다.
+
+5. **결과·설치·실행:** 성공한 같은 출력 폴더의 APP_PACKAGE_MANIFEST.json과 INSTALL.md를 읽습니다. 실제 설치 명령과 ManifestSha256은 생성된 INSTALL.md를 그대로 따릅니다. 지금 생성하지 않은 해시·명령을 만들어 적지 않습니다. 다른 새 설치 경로를 사용하고 공식 승인 host 바로가기로 실행합니다. 바로가기 기동과 PC 상태·SDP 상태는 따로 확인합니다. 기존 프로젝트·이전 설치·제출물을 지우지 않습니다. 마무리 자료는 같은 한 번의 포장에서 나온 finish.commit.raw·finish.archive.tar.gz·app.zip·APP_PACKAGE_MANIFEST.json 네 파일이며, 제출은 사용자 확인 없이 실행하지 않습니다.
+
+
+
 ## 처음 실행하는 사람을 위한 한 장 안내
 
-2026-10-26(KST) · 현재 소스 앱 0.2.11 기준. 기본 포장과 바로가기는 목표이며, 현재 package-app 명령은 제공되지 않았습니다. 아래는 기존 소스 폴더에서 실행하는 방법입니다.
+2026-10-26(KST) · 현재 소스 앱 0.2.19 기준. package-app 제공 도구가 추가됐습니다. 아래는 기존 소스 폴더 실행 방법이며, 설치형 포장은 아래 0.2.19 업데이트 절의 별도 준비가 필요합니다.
 
 **1. 필요한 프로그램과 작업 폴더 확인**
 
@@ -33,7 +95,7 @@ npm start
 
 **3. 결과를 구분하고 종료·재실행**
 
-기본 실행에서 SDP 미연결·ENGINE_NOT_CONNECTED가 보일 수 있습니다. 로컬 서버 시작과 실제 SDP 연결은 별개입니다. 「다시 조회」는 해당 학생 영역만 갱신합니다. 예시를 보려면 Ctrl+C 후 `npm run demo`를 실행하며, 예시·실제 조회 아님 표시를 확인합니다. 이 자료는 PC 실측이 아닙니다. CPU·메모리·디스크와 Windows 조회는 준비 대기입니다.
+기본 실행에서 SDP 미연결·ENGINE_NOT_CONNECTED가 보일 수 있습니다. 로컬 서버 시작과 실제 SDP 연결은 별개입니다. 「다시 조회」는 해당 학생 영역만 갱신합니다. 예시를 보려면 Ctrl+C 후 `npm run demo`를 실행하며, 예시·실제 조회 아님 표시를 확인합니다. 이 자료는 PC 실측이 아닙니다. 보호 현황의 제공 「내 PC 상태」에서 서버 실행 PC를 조회합니다. 읽지 못한 값은 확인 불가이며, 실제 Windows 조회는 해당 PC에서 확인해야 합니다.
 
 종료는 서버를 실행한 창에서 Ctrl+C입니다. 종료 뒤 같은 폴더에서 `npm start`를 실행하면 기본 모드로 다시 시작합니다. 브라우저 탭만 닫는 것은 서버 종료가 아닙니다.
 
@@ -45,7 +107,7 @@ npm start
 | EADDRINUSE 또는 주소가 이미 사용 중 | 자신이 켜 둔 케셰브 창에서 Ctrl+C. 다른 프로그램이나 모르는 프로세스를 임의 종료하지 않음 |
 | 페이지 연결 거부 | 시작 로그·실행 창 유지·주소 확인. 첫 오류를 기록하고 기존 파일을 보존 |
 | SDP 미연결·조회 실패 | 예시로 대체하지 않음. 계정 연결·앱 실행 상태와 제공 도움정보 확인. 권한 준비는 담당자에게 문의 |
-| Missing script: "package-app" | 현재 제공 도구가 없음. 담당자 제공 업데이트가 필요하며 임의 포장기를 만들지 않음 |
+| Missing script: "package-app" | 현재 폴더의 package.json 버전을 확인. 0.2.19에는 명령이 있으므로 이전 작업본·실행 위치를 확인하고 공식 업데이트를 사용 |
 
 처음 보는 사람의 실제 실행·Windows·설치형 반영은 아직 미확인입니다. 아래 상세 문서는 제공 부분과 학생 변경, 구성도, 지원 범위 및 기존 재현 기록을 설명합니다.
 
