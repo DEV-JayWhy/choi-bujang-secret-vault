@@ -2,6 +2,17 @@
 
 현재 방어 단계는 **12**이며 보너스 **xdr-06 exfiltration**를 추가했습니다. 공개 Production은 https://choi-bujang-secret-vault-xi.vercel.app 이고 저장소는 https://github.com/DEV-JayWhy/choi-bujang-secret-vault 입니다. 현재 배포 커밋은 `GET /aleph.json`의 `commit`으로 확인합니다. 예전 단계별 작업 기록은 [보존한 이력](docs/history/stage1-to-stage10.md)에 있습니다. 이력의 과거 공개 API·단계 숫자는 현재 동작 설명이 아닙니다.
 
+## 학생 부분 · 케셰브 13~22단계와 21단계 실행 문서
+
+케셰브는 본인의 로그인·기기·세션, 업무 앱 접근 판정, 접속·XDR 기록을 표시하고 AI 사건 설명·조치 상태·설치 패키지 취약점 조회 결과를 구분하는 로컬 보안 Agent입니다. 현재 학생 표시 함수 8개는 `on-client/student/extension.mjs`에 구현돼 있습니다. 이 아래의 기존 12단계 설명과 배포 기록은 보존하며 케셰브 앱 실행 절차와 구분합니다.
+
+- 실행 설명서·글로 쓴 구성도·제공/학생 구현 경계·오류 복구·검증 기록: [docs/STUDENT_RUNBOOK.md](docs/STUDENT_RUNBOOK.md)
+- 앱 작업 위치: `on-client`. 구성은 브라우저 → 로컬 서버 → 설정된 접근 제어·XDR 어댑터 / 서버 AI 서비스이며 OSV 조회는 승인된 공개 패키지만 담당합니다.
+- 앱 package 버전 `0.2.11`, Node.js 수업 기준 `24.19.0`, Windows 실행 도구의 허용 범위 22~24. 이번 직접 확인은 Linux x86_64·Node.js `v24.22.1`·npm `11.9.0`입니다. Windows PowerShell 및 실제 브라우저 동작은 미확인입니다.
+- 앱 폴더에서 `npm run check`, `npm start` 또는 별도의 `npm run demo`를 사용하며 브라우저 주소는 `http://127.0.0.1:5189/`입니다. 기본은 `disconnected`, 예제는 `demo`이고 운영 연결 성공이 아닙니다. 앱 폴더에는 외부 npm 의존성이 없어 기본 실행에 별도 설치가 필요하지 않습니다.
+- 실제 AI·SDP/XDR·조치 집행·OSV 외부 조회와 새 Windows 환경 재현은 미확인입니다. 실제 학생 조치 집행·효과 확인은 미완료(UNV)입니다.
+- 21·22단계는 이번 공식 안내에 따라 저장소와 40자리 커밋을 직접 입력하고, 비공개 커밋은 과제 화면의 원문 도구를 사용합니다. 워크벤치 「포털 제출 준비」는 현재 13~20단계용입니다. 서버 AI의 원문 검토는 명령 실행이나 새 환경 재현을 대신하지 않습니다.
+
 ## 12단계 작전실 · 실제 결과와 미실행
 
 `/operations.html`에서 「읽기 전용 API 점검 실행」을 누릅니다. Vercel Hobby의 함수 12개 제한을 지키기 위해 `/api/checks`는 기존 세션 함수의 별도 operations view로 rewrite되며, 원래 세션 요청은 기존 인증 처리기로 전달합니다. `/api/checks`는 지정된 Production에 실제 GET 요청을 보내고 요청 ID·ID 출처·확인 시각·HTTP 상태·정상/금지 구분을 반환합니다. 메모 응답은 구조만 검사한 뒤 폐기하며 본문·제목·사용자 ID·토큰을 JSON에 넣지 않습니다. 확인 실패를 통과로 바꾸지 않습니다. 검사 당시 배포 SHA와 요청 대상 SHA가 다르면 일치로 기록하지 않습니다.
