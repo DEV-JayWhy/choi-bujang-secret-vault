@@ -1,6 +1,6 @@
 # 케셰브 22단계 최종 인수인계·재현 기록
 
-작성일: 2026-10-26(KST). 릴리스 상태는 **검증 중**입니다. 실제 학생 계정의 19단계 집행·효과 확인 연결은 미완료(UNV)이며, 운영 인증이나 v1.0 인증을 주장하지 않습니다. 공식 AI 판정과 단계 제출은 미실행입니다.
+작성일: 2026-10-26(KST). 릴리스 상태는 **검증 중**입니다. 실제 학생 계정의 19단계 집행·효과 확인 연결은 미완료(UNV)이며, 운영 인증이나 v1.0 인증을 주장하지 않습니다. 6d216c499d37 제출의 공식 피드백은 2026-10-26 10:36 KST에 reproduction_record_consistency 실패였습니다. 이번 보완본은 아직 제출하지 않았습니다.
 
 ## 1. 인수인계 대상과 버전
 
@@ -9,14 +9,25 @@
 | 저장소 | `https://github.com/DEV-JayWhy/choi-bujang-secret-vault` |
 | 원본 브랜치 | `main` |
 | 새 복제의 최초 고정 커밋 | `74ebcf5a9869d603ff675e832bcb498860695b8a` — 21단계 문서 포함 버전 |
-| 최종 제출 커밋 | 이 문서·재현 도구를 포함하는 커밋. 정확한 40자리 값은 최종 새 checkout의 `git rev-parse HEAD` 및 별도 최종 실행 증거 JSON의 `commit`으로 식별 |
+| 실제 실행을 확인한 커밋 | `6d216c499d37fd80ed1fa4a54ba84ffe76e8d9f1` — 새 clone의 깨끗한 checkout에서 실행 |
+| 이번 증거 보완 커밋 | 현재 HEAD. 이전 실행 기록을 저장소 원문 안에 포함하고 문서만 보완. 실행 커밋과 보완 커밋을 같은 SHA라고 적지 않음 |
+| 포함된 실행 증거 | [evidence/reproduction-6d216c499d37.json](evidence/reproduction-6d216c499d37.json), 7,126바이트 |
 | 앱 package 버전 | `on-client/package.json`의 `0.2.11` 유지. v1.0으로 올리지 않음 |
 | 동일 앱 원문 식별 | `git rev-parse HEAD:on-client` = `1ba586a69f3d40500ecef8c1ca154d7459626916`. 이번 단계는 루트 README·학생 문서·검사 도구만 추가/수정하며 앱 코드는 변경하지 않음 |
 | 실제 확인 환경 | Linux x86_64, Node.js `v24.22.1`, npm `11.9.0`. 수업 기준 `24.19.0`과 실제 실행 버전을 구분 |
 | 실행 설명서 | [STUDENT_RUNBOOK.md](STUDENT_RUNBOOK.md) — 경로·명령·구성도·지원 환경·제공/학생 경계 |
 | 재현 도구 | [verify-final.mjs](verify-final.mjs) — Node 내장 모듈만 사용, 결과는 프로젝트 밖의 새 JSON 파일로 생성 |
 
-커밋은 자신의 해시를 원문에 포함할 수 없으므로 최종 해시를 임의로 문서에 채우지 않습니다. 문서를 포함한 최종 커밋을 다시 복제하고, 그 checkout에서 실행한 별도 JSON의 `commit`, `cleanBefore`, `cleanAfter`, `startedAt`, `finishedAt`, `stages`, `http`를 함께 인계합니다. JSON을 다시 커밋해 다른 커밋을 만든 뒤 옛 JSON을 새 커밋의 실행 증거로 쓰지 않습니다.
+실제 실행 JSON을 이 커밋의 `docs/evidence/`에 포함했습니다. 외부 파일이 추후 전달될 예정이라는 설명으로 대신하지 않습니다. JSON의 실행 커밋은 `6d216c499d37fd80ed1fa4a54ba84ffe76e8d9f1`이고, 관측은 그 커밋에서 수행한 결과입니다. 이번 문서·증거 보완은 별도 커밋이며 이를 같은 커밋 실행이라고 바꾸어 기록하지 않습니다.
+
+검토자는 JSON의 `onClientTree`와 이번 HEAD의 `git rev-parse HEAD:on-client`를 비교할 수 있습니다. 두 값은 `1ba586a69f3d40500ecef8c1ca154d7459626916`이고, 앱 전체 파일이 동일합니다. 재현 도구 `docs/verify-final.mjs`와 21단계 설명서도 변경하지 않습니다. 아래 읽기 전용 대조가 빈 차이를 반환해야 하며, 차이가 있으면 이전 실행 결과를 적용하지 않고 그 새 버전을 다시 실행해야 합니다.
+
+```powershell
+git diff 6d216c499d37fd80ed1fa4a54ba84ffe76e8d9f1 HEAD -- on-client docs/verify-final.mjs docs/STUDENT_RUNBOOK.md
+git rev-parse HEAD:on-client
+```
+
+포함된 JSON의 SHA-256은 `f5e705d9ff67bf1b9fa785c2d9fdd3b78bb0a1170c1a600b02c49869ded86a44`입니다. 새 커밋 해시를 JSON 안에 허위로 바꾸거나, 예비 검사 결과를 최종 실행 결과로 바꾸지 않았습니다.
 
 ## 2. 원래 작업 보존과 새 폴더 받기
 
@@ -87,25 +98,37 @@ node .\docs\verify-final.mjs --output ..\keshev-evidence\final-reproduction.json
 
 `result: passed_within_scope`는 이 도구가 수행한 범위만 통과했다는 뜻입니다. `cleanBefore`·`cleanAfter`가 false이면 `candidate_dirty_worktree_only`로 기록해 최종 깨끗한 checkout의 증거와 구분합니다. 실제 집행 미완료가 남으므로 `releaseState`는 계속 `verification_in_progress`입니다.
 
-## 5. 13~21단계 기능별 확인 기록
+## 5. 실제 최종 실행 기록과 13~21단계 관찰
 
-아래 표는 2026-10-26 10:10:26 KST의 **예비 검사** 결과입니다. 당시 HEAD는 21단계 기준 커밋이고 새 검사 도구가 미추적 상태였으므로 최종 커밋 실행 성공으로 취급하지 않습니다. 최종 기록은 별도로 전달하는 JSON의 동일 `commit` 아래 `stages` 배열에 단계별 `checkedAt`과 결과를 다시 남깁니다. 이 표와 과거 커밋의 통과 결과를 합쳐 최종 버전 전체 성공으로 표시하지 않습니다.
+이 절은 예비 검사가 아니라 포함된 [실행 증거 JSON](evidence/reproduction-6d216c499d37.json)의 실제 기록입니다.
 
-| 단계 | 기능·예비 관찰 결과 | 근거 종류·시각 | 실제 사용 미확인 원인 |
-|---|---|---|---|
-| 13 | 사용자·기기·세션과 unknown/active 코드 표시 | `renderIdentity`, 모의 DOM, 10:10:26 KST | 본인 실제 계정·기기 연결 없음 |
-| 14 | unknown을 접근 허용으로 표현하지 않음 | `renderDecision`, 모의 DOM, 같은 시각 | 실제 업무 앱 판정 요청 미실행 |
-| 15 | 입력 배열 불변·최신순·상세 근거/규칙 표시 | `renderEvents`, 모의 DOM, 같은 시각 | 실제 접속·XDR 원천 연결 없음 |
-| 16 | 빈 기기·세션 loading·진단 미조회 구분 | `renderStatus`, 모의 DOM, 같은 시각 | 실제 기기·세션·브라우저 복사 동작 미확인 |
-| 17 | test/verified·설명 미실행·idle 초기화 | `renderAiConnection`, 모의 DOM, 같은 시각 | 앱 승인·모델 응답 실제 점검 미실행 |
-| 18 | 사건 근거·규칙·unknown 표시, 잘못된 ID 거절, event null 오류 우선 | `renderExplanation`, 모의 DOM, 같은 시각 | 유료 설명 호출 미실행, 브라우저 비동기 경쟁 미확인 |
-| 19 | 11상태·ACK/효과 구분, succeeded와 effectApplied true만 효과 표시, 실행 버튼 없음 | `renderAction`, 모의 DOM, 같은 시각 | 실제 집행기 연결 미완료(UNV) |
-| 20 | 정확한 버전·partial ID 유지·전체 상태·loading 초기화 | `renderVulnerabilities`, 모의 DOM, 같은 시각 | 승인 프로젝트 OSV 조회·설치 버전 실제 대조 미실행 |
-| 21 | 실행 설명서의 명령·구성도·미확인 범위가 존재 | `STUDENT_RUNBOOK.md`, 원문 확인, 같은 시각 | 새 Windows·실제 브라우저 재현 미확인 |
+| 항목 | 실제 값 |
+|---|---|
+| 실행 커밋 | `6d216c499d37fd80ed1fa4a54ba84ffe76e8d9f1` |
+| 실행 시각 | 2026-10-26 10:15:08.048~10:15:08.548 KST (`2026-10-26T01:15:08.048Z`~`2026-10-26T01:15:08.548Z`) |
+| 환경·버전 | Linux x64, Node.js v24.22.1, npm 11.9.0, 앱 0.2.11 |
+| 작업 트리 | `cleanBefore: true`, `cleanAfter: true` |
+| 실행 절차 | 새 Git clone → 정확한 커밋 detached checkout → `node docs/verify-final.mjs --output ../keshev-evidence/final-reproduction.json` |
+| 범위 내 결과 | `passed_within_scope`, 문법 검사 통과, 13~21단계 검사 9개 묶음, 로컬 GET 18건 |
+| 운영 상태 | `verification_in_progress`, 실제 집행 연결 미완료(UNV) |
 
-예비 HTTP 검사는 기본 `/`, `/student/extension.mjs` HTTP 200, `/api/me`·`/api/events` HTTP 503 및 `ENGINE_NOT_CONNECTED`, `/api/diagnostics` HTTP 200, `/api/vulnerabilities` 전체 `not_configured`를 확인했습니다. 예제는 `/api/events` HTTP 200, `demo`, 1건이고 기본 재시작은 다시 `disconnected`였습니다. 최종 JSON은 3개 실행 구분별 6건, 총 18건에 각각 시각을 기록합니다.
+다음 시각은 JSON의 `stages[].checkedAt` 원문(UTC)입니다. 모의 DOM 결과는 실제 브라우저·운영 연결 성공이 아닙니다.
 
-실제 브라우저·실제 연결·공식 제출을 수행했다고 기록하지 않습니다. AI 원문 검토는 실행 검증이 아니며, 이 재현 기록도 서버가 새 환경에서 실행했다는 증거가 아닙니다.
+| 단계 | 기능·관찰 결과 | 근거 종류 | 확인 시각(UTC) | 실제 사용 미확인 원인 |
+|---|---|---|---|---|
+| 13 | 본인·기기·세션 표시 및 원래 상태 코드 | mock_dom | `2026-10-26T01:15:08.215Z` | 실제 본인 계정·기기 연결 없음 |
+| 14 | unknown은 접근 허용이 아님 | mock_dom | `2026-10-26T01:15:08.215Z` | 실제 업무 앱 판정 요청 미실행 |
+| 15 | 원본 불변·최신순 목록·버튼 상세 근거·규칙 | mock_dom | `2026-10-26T01:15:08.216Z` | 실제 접속·XDR 원천 연결 없음 |
+| 16 | 빈 목록·loading·미조회 진단 구분 | mock_dom | `2026-10-26T01:15:08.216Z` | 실제 기기·세션·브라우저 복사 미확인 |
+| 17 | test/verified·설명 미실행·idle 초기화 | mock_dom | `2026-10-26T01:15:08.217Z` | 실제 앱 승인·모델 점검 미실행 |
+| 18 | 현재 사건 근거·규칙·unknown·잘못된 ID 거절·event null 오류 | mock_dom | `2026-10-26T01:15:08.218Z` | 유료 설명·브라우저 비동기 경쟁 미확인 |
+| 19 | 11상태·ACK와 효과 구분·효과 true만 확인·학생 실행 버튼 없음 | mock_dom | `2026-10-26T01:15:08.219Z` | 실제 집행기 연결 미완료(UNV) |
+| 20 | 정확한 버전·partial ID 보존·전체 상태·loading 초기화 | mock_dom | `2026-10-26T01:15:08.220Z` | 실제 승인 대상 OSV·설치 버전 대조 미실행 |
+| 21 | 현재 원문의 설명서·명령·구성도·제한 확인 | source_review | `2026-10-26T01:15:08.220Z` | 새 Windows·실제 브라우저 미확인 |
+
+HTTP 증거는 JSON의 `http` 배열에 실행 구분·경로·응답 코드·모드·시각으로 포함돼 있습니다. 기본·예제·기본 재시작 각 6건이며, `/`와 학생 모듈은 HTTP 200, 기본 엔진 조회는 HTTP 503/ENGINE_NOT_CONNECTED, 예제 기록은 HTTP 200/demo/1건, 진단은 HTTP 200, 패키지는 not_configured였습니다. 앱 시작을 실제 엔진·AI·OSV 성공으로 해석하지 않습니다.
+
+이전 문서의 21단계 기준 커밋 예비 검사(10:10:26 KST)는 개발 이력이며 이 표의 근거가 아닙니다. 서로 다른 커밋의 통과 결과를 합산하지 않았습니다. 실제 브라우저·Windows·운영 연결·유료 AI·실제 집행·OSV 외부 조회·공식 통과는 JSON의 unverified 및 boundaries대로 미확인입니다. 서버의 원문 검토는 이 JSON의 명령을 실행해 검증한 것이 아닙니다.
 
 ## 6. 데이터 보존·백업·복원 계획
 
@@ -132,7 +155,8 @@ node .\docs\verify-final.mjs --output ..\keshev-evidence\final-reproduction.json
 | `5a4da5d121502ce57cfeb8e83efebaf36a689e0a` | 19단계 조치 상태 표시 | 동일. 실제 집행 연결은 계속 미완료 |
 | `a729088c618f00a25de15a9ec9fa4e7a56c01552` | 20단계 패키지·OSV 표시 | 동일. 실제 외부 조회 성공을 주장하지 않음 |
 | `74ebcf5a9869d603ff675e832bcb498860695b8a` | 21단계 실행 설명서·구성도 | 새 Git clone의 최초 기준. 최종 커밋과 동일한 on-client 트리 |
-| 이 문서를 포함하는 최종 HEAD | 22단계 인수인계·보존 계획·재현 도구 | 문서·도구 변경을 같은 커밋에 저장하고 새 clone에서 다시 검사. 정확한 최종 SHA는 전달한 JSON으로 식별 |
+| `6d216c499d37fd80ed1fa4a54ba84ffe76e8d9f1` | 22단계 최초 제출본·실제 최종 재현 | 이번에 포함한 JSON의 실행 대상. 원문 검토에서는 증거 전달 누락으로 실패 |
+| 증거 보완 커밋(현재 HEAD) | 실제 실행 JSON 포함·문서 보완 | 앱·재현 도구·21단계 설명서 동일성 대조. 기존 JSON의 실행 SHA를 보완 커밋 SHA로 변경하지 않음 |
 
 예비 검사 도구의 결과 요약 출력에서 변수명 오류가 한 번 발생했습니다. 학생 앱 코드는 수정하지 않고 도구의 출력 참조를 고친 뒤 재실행했습니다. 이 실패를 성공으로 바꾸지 않으며 수정된 도구가 포함된 최종 커밋에서 다시 확인합니다.
 
@@ -144,4 +168,4 @@ node .\docs\verify-final.mjs --output ..\keshev-evidence\final-reproduction.json
 
 `student-source-cli.mjs`의 전체 명령·사용자 PC 경로는 확인하지 않았으므로 임의 옵션/경로를 만들지 않습니다. 과제 화면의 명령에서 도구·출력 경로와 `--commit`만 실제 값으로 확인합니다. 원문 전달 완료와 판정 통과는 다르며, 원문 전달만 실패하면 「원문만 다시 보내기」를 사용합니다. 이번에 임의 제출하지 않았습니다.
 
-사용자의 첫 직접 확인은 원래 폴더와 Git 기록이 남아 있는지 확인하는 것입니다. 그다음 새 폴더의 HEAD와 전달받은 최종 JSON의 commit이 같은지 비교하고, Windows·브라우저 확인은 실행 설명서 순서대로 이어 갑니다. 실제 조치를 시험 삼아 집행하지 않습니다.
+사용자의 첫 직접 확인은 새 제출 원문에 `docs/evidence/reproduction-6d216c499d37.json`이 포함돼 있는지 확인하는 것입니다. 원래 폴더와 Git 기록도 보존합니다. JSON의 실행 커밋과 이번 보완 커밋은 구분하며, Windows·브라우저 확인은 실행 설명서 순서대로 이어 갑니다. 실제 조치를 시험 삼아 집행하지 않습니다.

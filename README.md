@@ -19,6 +19,10 @@
 
 Git 최상위에서 `node docs/verify-final.mjs --output ../keshev-evidence/final-reproduction.json`으로 실행합니다. 이 도구는 Linux·Node.js v24.22.1에서 확인하며 Windows·실제 브라우저는 미확인입니다. `on-client` 앱 원문과 package 버전 0.2.11은 유지합니다. 실제 AI·SDP/XDR·OSV 외부 조회와 19단계 실제 집행·효과 확인은 미확인/미완료(UNV)이므로 릴리스 상태는 검증 중이며 v1.0 또는 운영 인증이 아닙니다. 공식 제출은 사용자가 수행하며 원문 검토를 실행 성공 증명으로 표현하지 않습니다.
 
+### 22단계 실행 증거 전달 보완
+
+실제 재현 커밋 `6d216c499d37fd80ed1fa4a54ba84ffe76e8d9f1`의 [실행 증거 JSON](docs/evidence/reproduction-6d216c499d37.json)을 저장소 원문에 포함했습니다. Linux·Node v24.22.1·npm 11.9.0·앱 0.2.11, 검사 전후 깨끗한 작업 트리, 단계 검사 9개 묶음과 HTTP 18건, 실행 시각·미확인 항목이 기록돼 있습니다. 이 커밋의 앱 원문 트리는 실행 커밋과 동일하며, 문서·증거 보완 커밋을 원래 실행 커밋과 혼동하지 않습니다. 자세한 결과·대조 명령은 [FINAL_HANDOFF.md](docs/FINAL_HANDOFF.md)에 있습니다.
+
 ## 12단계 작전실 · 실제 결과와 미실행
 
 `/operations.html`에서 「읽기 전용 API 점검 실행」을 누릅니다. Vercel Hobby의 함수 12개 제한을 지키기 위해 `/api/checks`는 기존 세션 함수의 별도 operations view로 rewrite되며, 원래 세션 요청은 기존 인증 처리기로 전달합니다. `/api/checks`는 지정된 Production에 실제 GET 요청을 보내고 요청 ID·ID 출처·확인 시각·HTTP 상태·정상/금지 구분을 반환합니다. 메모 응답은 구조만 검사한 뒤 폐기하며 본문·제목·사용자 ID·토큰을 JSON에 넣지 않습니다. 확인 실패를 통과로 바꾸지 않습니다. 검사 당시 배포 SHA와 요청 대상 SHA가 다르면 일치로 기록하지 않습니다.
