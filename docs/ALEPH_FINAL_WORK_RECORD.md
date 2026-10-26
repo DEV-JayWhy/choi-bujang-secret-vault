@@ -110,3 +110,12 @@ npm start
 - 다음에 확인할 것: 학생이 실사용을 원할 때 새 경로에 현재 소스를 받고, 공식 R7 미리보기·설치 준비, 기본 실행과 항목별 출처·측정 시각·단위·확인 불가, 수동 재조회·키보드 동작, 실제 아이콘·커밋·새 출력 폴더를 차례로 확인합니다. 성공한 한 번의 포장 결과가 생긴 뒤 manifest의 source.git.head·네 파일의 결속·INSTALL.md·승인 host 바로가기를 확인해 이 기록을 갱신합니다. 지금은 추가 다운로드·실행을 요구하지 않습니다.
 
 관련 문서: [시연·한계 정리](DEMO_HANDOFF.md), [실행 설명서](STUDENT_RUNBOOK.md), [총공세 계획](FINAL_ASSAULT_PLAN.md). 이 파일은 개인 정리이며, 기존 접수·공식 판정·점수를 바꾸거나 제출을 대신하지 않습니다.
+
+
+## 9. 후속 확인 — 실제 브라우저 캡처와 정식 포장 시도
+
+2026-10-26(KST)에 AI Linux 환경의 실제 Chromium 브라우저에서 예제 모드 없이 앱을 실행하고 「내 PC 확인」을 눌렀습니다. [앱 첫 화면](evidence/screenshots/keshev-actual-linux.png)과 [PC 상태 화면](evidence/screenshots/keshev-pc-status-linux.png)을 보존했습니다. CPU·메모리·디스크는 AI Linux 환경 실측이고, 사용자 Windows PC 실측이 아닙니다. SDP 미연결, 네트워크 조회 실패, Windows 전용 항목 확인 불가를 그대로 표시했습니다. 실제 브라우저 캡처는 위 절의 당시 ‘화면 없음’ 기록 이후 추가된 근거입니다. 키보드·화면 낭독기와 설치된 앱 실행은 확인하지 않았습니다.
+
+깨끗한 커밋 `9ebd2b95a0df0904e999063093e49b28ac7f2a51`에서 제공 `npm run package-app`에 `--finish-materials`를 붙여 실제 실행했습니다. 종료 코드 1·`PROVIDED_RUNTIME_NOT_INSTALLED`이며 출력 폴더와 필수 네 파일은 생성되지 않았습니다. R7 원본의 서명은 공식 설치기 공개키로 확인했지만 현재 환경에 설치된 것은 아닙니다. `--app-only-v1`·가짜 승인·캐시 수동 조립으로 우회하지 않았습니다.
+
+현재 문서·캡처·PNG 준비는 포장 완료나 최종 제출 완료가 아닙니다. [포장 상태·후속 명령](PACKAGING_STATUS.md), [포장 시도 원문](evidence/packaging-attempt.json), [서명·아이콘 사전 확인](evidence/packaging-preflight.json), [브라우저 관찰 원문](evidence/browser-capture.json)을 함께 봅니다.

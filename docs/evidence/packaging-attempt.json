@@ -1,0 +1,33 @@
+{
+  "checkedAt": "2026-10-26T06:41:49.946592+00:00",
+  "environment": "Linux-6.18.55-x86_64-with-glibc2.39",
+  "node": "v24.22.1",
+  "commit": "9ebd2b95a0df0904e999063093e49b28ac7f2a51",
+  "gitStatusBefore": "",
+  "cwd": "/workspace/scratch/7380a671d71a/keshev-finish-preparation/on-client",
+  "command": [
+    "npm",
+    "run",
+    "package-app",
+    "--",
+    "--source",
+    ".",
+    "--out",
+    "/workspace/scratch/7380a671d71a/keshev-packaging-output/keshev-0.2.19-finish",
+    "--iconPath",
+    "/workspace/scratch/7380a671d71a/keshev-packaging-inputs/keshev-icon.png",
+    "--finish-materials"
+  ],
+  "exitCode": 1,
+  "stdout": "\n> alekov-client-starter@0.2.19 package-app\n> node tools/package-app.mjs --source . --out /workspace/scratch/7380a671d71a/keshev-packaging-output/keshev-0.2.19-finish --iconPath /workspace/scratch/7380a671d71a/keshev-packaging-inputs/keshev-icon.png --finish-materials\n\n",
+  "stderr": "npm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n{\"ok\":false,\"code\":\"PROVIDED_RUNTIME_NOT_INSTALLED\",\"message\":\"이 PC에 승인된 전체 앱 실행 환경이 아직 설치되지 않았습니다. 원본은 그대로 두었습니다. 담당자의 실행 환경 설치 안내를 기다려 주세요.\"}\n",
+  "outputDirectoryExists": false,
+  "requiredFiles": {
+    "finish.commit.raw": false,
+    "finish.archive.tar.gz": false,
+    "app.zip": false,
+    "APP_PACKAGE_MANIFEST.json": false
+  },
+  "bypassUsed": false,
+  "windowsInstallVerified": false
+}

@@ -1,0 +1,20 @@
+{
+  "schema": "keshev.packaging-preflight.v1",
+  "checkedAt": "2026-10-26T06:42:42.969Z",
+  "runtimeVersion": "0.2.19",
+  "revision": 7,
+  "signatureVerifiedAgainst": "public catalog roots bundled in the official R7 installer",
+  "signed": true,
+  "archiveSha256": "7d6deb9f70533424b3cd53a82c7639c70b5fd5c871ad011060394ba488c6bfae",
+  "installed": false,
+  "windowsHostExecutionVerified": false,
+  "icon": {
+    "source": "on-client/public/assets/alekov/alekov-app-icon.webp",
+    "format": "PNG",
+    "width": 256,
+    "height": 256,
+    "officialPngIconValidator": "passed",
+    "brandApproval": "not independently verified"
+  },
+  "note": "Archive signature verification is not installation, runtime approval provisioning, Windows launch verification, or final package creation."
+}
