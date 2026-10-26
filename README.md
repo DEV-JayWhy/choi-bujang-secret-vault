@@ -13,6 +13,12 @@
 - 실제 AI·SDP/XDR·조치 집행·OSV 외부 조회와 새 Windows 환경 재현은 미확인입니다. 실제 학생 조치 집행·효과 확인은 미완료(UNV)입니다.
 - 21·22단계는 이번 공식 안내에 따라 저장소와 40자리 커밋을 직접 입력하고, 비공개 커밋은 과제 화면의 원문 도구를 사용합니다. 워크벤치 「포털 제출 준비」는 현재 13~20단계용입니다. 서버 AI의 원문 검토는 명령 실행이나 새 환경 재현을 대신하지 않습니다.
 
+## 학생 부분 · 22단계 최종 인수인계와 재현
+
+최종 인수인계·버전 이력·단계별 재현·데이터 보존/복원 계획은 [docs/FINAL_HANDOFF.md](docs/FINAL_HANDOFF.md)에 있습니다. 같은 최종 커밋을 새 폴더에 복제한 뒤 [docs/verify-final.mjs](docs/verify-final.mjs)를 실행하면 그 checkout의 40자리 커밋과 검사 전후 상태·시각·모의 DOM·로컬 HTTP 결과를 프로젝트 밖 JSON에 기록합니다.
+
+Git 최상위에서 `node docs/verify-final.mjs --output ../keshev-evidence/final-reproduction.json`으로 실행합니다. 이 도구는 Linux·Node.js v24.22.1에서 확인하며 Windows·실제 브라우저는 미확인입니다. `on-client` 앱 원문과 package 버전 0.2.11은 유지합니다. 실제 AI·SDP/XDR·OSV 외부 조회와 19단계 실제 집행·효과 확인은 미확인/미완료(UNV)이므로 릴리스 상태는 검증 중이며 v1.0 또는 운영 인증이 아닙니다. 공식 제출은 사용자가 수행하며 원문 검토를 실행 성공 증명으로 표현하지 않습니다.
+
 ## 12단계 작전실 · 실제 결과와 미실행
 
 `/operations.html`에서 「읽기 전용 API 점검 실행」을 누릅니다. Vercel Hobby의 함수 12개 제한을 지키기 위해 `/api/checks`는 기존 세션 함수의 별도 operations view로 rewrite되며, 원래 세션 요청은 기존 인증 처리기로 전달합니다. `/api/checks`는 지정된 Production에 실제 GET 요청을 보내고 요청 ID·ID 출처·확인 시각·HTTP 상태·정상/금지 구분을 반환합니다. 메모 응답은 구조만 검사한 뒤 폐기하며 본문·제목·사용자 ID·토큰을 JSON에 넣지 않습니다. 확인 실패를 통과로 바꾸지 않습니다. 검사 당시 배포 SHA와 요청 대상 SHA가 다르면 일치로 기록하지 않습니다.
